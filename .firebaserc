@@ -1,0 +1,10 @@
+{
+  "projects": {
+    "default": "mangoteamapphoctap"
+  },
+  "hosting": {
+    "mangoteamapphoctap": [
+      "mangoteamapphoctap"
+    ]
+  }
+}
