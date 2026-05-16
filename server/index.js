@@ -10,7 +10,6 @@ const app = express();
 const server = createServer(app);
 const PORT = process.env.PORT || 3001;
 
-// Cấu hình CORS cho Socket.IO
 const io = new Server(server, {
   cors: {
     origin: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -19,30 +18,113 @@ const io = new Server(server, {
   }
 });
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Lưu trữ tin nhắn và người dùng (trong bộ nhớ - dùng cho dev, cần DB cho production)
-const messages = [];
-const users = {};
+// ==================== ROOM STORAGE ====================
+// rooms = { roomId: { messages: [], users: {} } }
+const rooms = {};
 let messageId = 0;
 
-// Health check endpoint
+// Track which room each socket is in
+const socketRoomMap = {}; // { socketId: roomId }
+
+function getRoom(roomId) {
+  if (!rooms[roomId]) {
+    rooms[roomId] = { messages: [], users: {} };
+  }
+  return rooms[roomId];
+}
+
+function normalizeRoomId(raw) {
+  const trimmed = (raw || '').trim();
+  return trimmed === '' ? 'global' : trimmed;
+}
+
+// ==================== REST API ====================
+
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// API lấy lịch sử tin nhắn (optional - cho lần đầu load)
-app.get('/api/messages', (req, res) => {
-  const lastMessages = messages.slice(-50); // Lấy 50 tin nhắn gần nhất
-  res.json(lastMessages);
+// Danh sách phòng đang hoạt động
+app.get('/api/rooms', (req, res) => {
+  const activeRooms = Object.entries(rooms)
+    .map(([roomId, data]) => ({
+      roomId,
+      userCount: Object.values(data.users).filter(u => u.online).length,
+      messageCount: data.messages.length,
+    }))
+    .filter(r => r.userCount > 0);
+  res.json(activeRooms);
 });
 
-// API lấy danh sách user online
+// Lịch sử tin nhắn theo phòng
+app.get('/api/rooms/:roomId/messages', (req, res) => {
+  const { roomId } = req.params;
+  const room = rooms[roomId];
+  if (!room) return res.json([]);
+  res.json(room.messages.slice(-50));
+});
+
+// Danh sách user online theo phòng
+app.get('/api/rooms/:roomId/users', (req, res) => {
+  const { roomId } = req.params;
+  const room = rooms[roomId];
+  if (!room) return res.json([]);
+  res.json(Object.values(room.users).filter(u => u.online));
+});
+
+// Legacy: backward compat → trỏ về phòng global
+app.get('/api/messages', (req, res) => {
+  const room = rooms['global'];
+  if (!room) return res.json([]);
+  res.json(room.messages.slice(-50));
+});
+
 app.get('/api/users', (req, res) => {
-  const onlineUsers = Object.values(users).filter(u => u.online);
-  res.json(onlineUsers);
+  const room = rooms['global'];
+  if (!room) return res.json([]);
+  res.json(Object.values(room.users).filter(u => u.online));
+});
+
+// ==================== AI PROXY (tránh CORS khi gọi Z.ai / Gemini từ trình duyệt) ====================
+app.post('/api/ai-proxy', async (req, res) => {
+  const { provider, model, apiKey, messages, generationConfig } = req.body;
+  if (!apiKey || !messages) {
+    return res.status(400).json({ error: 'Thiếu apiKey hoặc messages' });
+  }
+  try {
+    let result = '';
+    if (provider === 'zai') {
+      const response = await fetch('https://api.z.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model, messages, temperature: 0.1 }),
+      });
+      const data = await response.json();
+      if (data.error) return res.status(400).json({ error: data.error.message });
+      result = data.choices[0].message.content;
+    } else {
+      // Gemini
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: messages[0].content }] }], generationConfig }),
+      });
+      const data = await response.json();
+      if (data.error) return res.status(400).json({ error: data.error.message });
+      result = data.candidates[0].content.parts[0].text;
+    }
+    res.json({ result });
+  } catch (err) {
+    console.error('[AI-PROXY ERROR]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ==================== SOCKET.IO EVENTS ====================
@@ -50,11 +132,34 @@ app.get('/api/users', (req, res) => {
 io.on('connection', (socket) => {
   console.log(`[CONNECT] ${socket.id}`);
 
-  // 1. USER JOINS (Người dùng tham gia)
+  // 1. USER JOINS (hoặc đổi phòng)
   socket.on('user-join', (userData) => {
-    const { nickname, animalName, emoji, progress } = userData;
-    
-    users[socket.id] = {
+    const { nickname, animalName, emoji, progress, roomId: rawRoomId } = userData;
+    const roomId = normalizeRoomId(rawRoomId);
+
+    // Rời phòng cũ nếu đang ở phòng khác
+    const prevRoomId = socketRoomMap[socket.id];
+    if (prevRoomId && prevRoomId !== roomId) {
+      const prevRoom = rooms[prevRoomId];
+      if (prevRoom && prevRoom.users[socket.id]) {
+        delete prevRoom.users[socket.id];
+        io.to(prevRoomId).emit('user-left', {
+          userId: socket.id,
+          nickname,
+          message: `${nickname} đã chuyển sang phòng khác!`,
+          users: Object.values(prevRoom.users).filter(u => u.online),
+          roomId: prevRoomId,
+        });
+      }
+      socket.leave(prevRoomId);
+    }
+
+    // Tham gia phòng mới
+    socket.join(roomId);
+    socketRoomMap[socket.id] = roomId;
+
+    const room = getRoom(roomId);
+    room.users[socket.id] = {
       id: socket.id,
       nickname,
       animalName,
@@ -62,23 +167,29 @@ io.on('connection', (socket) => {
       emoji: emoji || '🙂',
       progress: typeof progress === 'number' ? progress : 0,
       joinedAt: new Date(),
-      socketId: socket.id
+      socketId: socket.id,
+      roomId,
     };
 
-    console.log(`[JOIN] ${nickname} (${animalName}) - ${socket.id}`);
+    console.log(`[JOIN] ${nickname} (${animalName}) → phòng "${roomId}" - ${socket.id}`);
 
-    // Broadcast lên tất cả client: người mới vào
-    io.emit('user-joined', {
-      users: Object.values(users).filter(u => u.online),
-      message: `${nickname} (${animalName}) vừa tham gia!`
+    io.to(roomId).emit('user-joined', {
+      users: Object.values(room.users).filter(u => u.online),
+      message: `${nickname} (${animalName}) vừa tham gia phòng "${roomId}"!`,
+      roomId,
     });
   });
 
-  // 2. SEND MESSAGE (Gửi tin nhắn)
+  // 2. SEND MESSAGE
   socket.on('send-message', (payload) => {
     const { text, timestamp } = payload;
-    const user = users[socket.id];
-
+    const roomId = socketRoomMap[socket.id];
+    if (!roomId) {
+      socket.emit('error', { message: 'Bạn chưa tham gia phòng nào' });
+      return;
+    }
+    const room = rooms[roomId];
+    const user = room?.users[socket.id];
     if (!user) {
       socket.emit('error', { message: 'Người dùng chưa join' });
       return;
@@ -93,87 +204,84 @@ io.on('connection', (socket) => {
       progress: user.progress,
       message: text,
       timestamp,
-      createdAt: new Date()
+      createdAt: new Date(),
+      roomId,
     };
 
-    messages.push(message);
-    console.log(`[MSG] ${user.nickname}: ${text}`);
-
-    // Broadcast tin nhắn lên tất cả client
-    io.emit('receive-message', message);
-
-    // Notification cho người gửi (optional)
+    room.messages.push(message);
+    console.log(`[MSG][${roomId}] ${user.nickname}: ${text}`);
+    io.to(roomId).emit('receive-message', message);
     socket.emit('message-sent', { success: true, messageId: message.id });
   });
 
-  // 3. UPDATE USER STATUS (Cập nhật trạng thái online)
+  // 3. UPDATE USER STATUS
   socket.on('update-status', (payload) => {
     const { online, progress } = payload;
-    const user = users[socket.id];
-
+    const roomId = socketRoomMap[socket.id];
+    if (!roomId) return;
+    const room = rooms[roomId];
+    const user = room?.users[socket.id];
     if (user) {
       user.online = online;
-      if (typeof progress === 'number') {
-        user.progress = progress;
-      }
-      console.log(`[STATUS] ${user.nickname} - online: ${online}`);
-
-      io.emit('user-status-updated', {
-        users: Object.values(users).filter(u => u.online)
+      if (typeof progress === 'number') user.progress = progress;
+      console.log(`[STATUS][${roomId}] ${user.nickname} - online: ${online}`);
+      io.to(roomId).emit('user-status-updated', {
+        users: Object.values(room.users).filter(u => u.online),
+        roomId,
       });
     }
   });
 
-  // 4. TYPING INDICATOR (Người dùng đang gõ)
+  // 4. TYPING INDICATOR
   socket.on('typing', (payload) => {
     const { isTyping } = payload;
-    const user = users[socket.id];
-
+    const roomId = socketRoomMap[socket.id];
+    if (!roomId) return;
+    const room = rooms[roomId];
+    const user = room?.users[socket.id];
     if (user) {
-      socket.broadcast.emit('user-typing', {
+      socket.to(roomId).emit('user-typing', {
         userId: socket.id,
         nickname: user.nickname,
-        isTyping
+        isTyping,
+        roomId,
       });
     }
   });
 
-  // 5. DISCONNECT (Người dùng ngắt kết nối)
+  // 5. DISCONNECT
   socket.on('disconnect', () => {
-    const user = users[socket.id];
-
+    const roomId = socketRoomMap[socket.id];
+    if (!roomId) return;
+    const room = rooms[roomId];
+    const user = room?.users[socket.id];
     if (user) {
-      console.log(`[DISCONNECT] ${user.nickname} - ${socket.id}`);
-
-      // Xóa user
-      delete users[socket.id];
-
-      // Broadcast: người dùng đã rời đi
-      io.emit('user-left', {
+      console.log(`[DISCONNECT][${roomId}] ${user.nickname} - ${socket.id}`);
+      delete room.users[socket.id];
+      io.to(roomId).emit('user-left', {
         userId: socket.id,
         nickname: user.nickname,
-        message: `${user.nickname} đã rời khỏi!`,
-        users: Object.values(users).filter(u => u.online)
+        message: `${user.nickname} đã rời khỏi phòng "${roomId}"!`,
+        users: Object.values(room.users).filter(u => u.online),
+        roomId,
       });
     }
+    delete socketRoomMap[socket.id];
   });
 
-  // Error handling
   socket.on('error', (error) => {
     console.error(`[ERROR] ${socket.id}:`, error);
   });
 });
 
-// Handle server errors
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err);
 });
 
-// Start server
 server.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════════╗
-║           🚀 EXAM MASTER CHAT SERVER STARTED                  ║
+║       🚀 EXAM MASTER CHAT SERVER (ROOMS MODE) STARTED         ║
 ╠════════════════════════════════════════════════════════════════╣
 ║  Server: http://localhost:${PORT}                              ║
 ║  WebSocket: ws://localhost:${PORT}                            ║
