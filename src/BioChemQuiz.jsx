@@ -151,7 +151,7 @@ export default function BioChemQuiz({ onClose, addXP, unlockBadge }) {
     if (aiExplanations[questionItem.name]) return;
     setLoadingAiId(questionItem.name);
 
-    const apiKey = localStorage.getItem('apifree_api_key') || 'sk-pXHdrH3bQhbDsxJdah7yW9se2xYcf';
+    const apiKey = localStorage.getItem('apifree_api_key') || 'sk-psBHjnJjNm0p55Fk41tp3YwFFNfeB';
     const promptText = `Bạn là một chuyên gia sinh hóa y học lâm sàng và giáo viên thông thái.
 Hãy giải thích thật ngắn gọn (dưới 80 từ), dễ hiểu và sinh động bằng tiếng Việt cho học sinh y khoa biết:
 Chỉ số xét nghiệm "${questionItem.name}" thuộc nhóm "${questionItem.category}" có trị số bình thường là "${questionItem.value}".

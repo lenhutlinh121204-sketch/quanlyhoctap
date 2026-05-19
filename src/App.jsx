@@ -416,8 +416,20 @@ export default function App() {
 
   const addActivityToFeed = async (type, details) => {
     if (!userNickname) return;
+    const emoji = ANIMAL_EMOJIS[userAnimal] || '🐾';
+    
+    // Gửi qua Socket.IO để các thành viên khác trong phòng nhận được tức thì
+    if (socket && socketConnected) {
+      socket.emit('new-activity', {
+        nickname: userNickname,
+        emoji: emoji,
+        type: type,
+        details: details || '',
+        roomId: currentRoom
+      });
+    }
+
     try {
-      const emoji = ANIMAL_EMOJIS[userAnimal] || '🐾';
       await addDoc(collection(db, 'activity_feed'), {
         nickname: userNickname,
         emoji: emoji,
@@ -563,6 +575,32 @@ export default function App() {
     // Lắng nghe lỗi
     newSocket.on('error', (error) => {
       console.error('❌ Socket error:', error);
+    });
+
+    // Lắng nghe hoạt động trực tiếp từ người khác
+    newSocket.on('receive-activity', (data) => {
+      console.log('📢 Realtime activity:', data);
+      playChatSound('receive');
+      
+      let actionText = '';
+      if (data.type === 'join') {
+        actionText = 'vừa gia nhập biệt đội!';
+      } else if (data.type === 'task_complete') {
+        actionText = 'đã hoàn thành nhiệm vụ:';
+      } else if (data.type === 'quiz_create') {
+        actionText = 'vừa tạo bộ đề mới:';
+      } else if (data.type === 'flashcard_create') {
+        actionText = 'vừa tạo bộ Flashcard mới:';
+      } else {
+        actionText = data.type || '';
+      }
+
+      setToastNotification({
+        id: Date.now(),
+        sender: data.nickname,
+        emoji: data.emoji || '📢',
+        text: `${actionText} ${data.details}`
+      });
     });
 
     // Lắng nghe connection error

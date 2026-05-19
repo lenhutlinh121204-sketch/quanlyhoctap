@@ -249,6 +249,13 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 5. NEW ACTIVITY BROADCAST
+  socket.on('new-activity', (payload) => {
+    const roomId = socketRoomMap[socket.id];
+    if (!roomId) return;
+    socket.to(roomId).emit('receive-activity', payload);
+  });
+
   // 5. DISCONNECT
   socket.on('disconnect', () => {
     const roomId = socketRoomMap[socket.id];

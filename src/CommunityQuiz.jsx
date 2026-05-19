@@ -291,7 +291,7 @@ export default function CommunityQuiz({ onClose, nickname, onActivityCreated, ad
   const [aiText, setAiText] = useState('');
   const [aiCount, setAiCount] = useState(10);
   const [aiPrompt, setAiPrompt] = useState('');
-  const [aiKey, setAiKey] = useState(localStorage.getItem('apifree_api_key') || 'sk-pXHdrH3bQhbDsxJdah7yW9se2xYcf');
+  const [aiKey, setAiKey] = useState(localStorage.getItem('apifree_api_key') || 'sk-psBHjnJjNm0p55Fk41tp3YwFFNfeB');
   const [isGenerating, setIsGenerating] = useState(false);
 
   const [isReadingFile, setIsReadingFile] = useState(false);
@@ -467,6 +467,15 @@ ${truncatedText}`;
   const [userAnswers, setUserAnswers] = useState({});
   const [showHint, setShowHint] = useState(false);
 
+  // States cho tính năng ôn tập câu sai bằng AI & làm lại để nhớ
+  const [showWrongReview, setShowWrongReview] = useState(false);
+  const [wrongReviewIndex, setWrongReviewIndex] = useState(0);
+  const [wrongReviewExplanations, setWrongReviewExplanations] = useState({}); // { [qIndex]: explanation }
+  const [loadingWrongReviewExplanation, setLoadingWrongReviewExplanation] = useState(false);
+  const [wrongReviewUserAnswer, setWrongReviewUserAnswer] = useState(null);
+  const [wrongReviewSuccess, setWrongReviewSuccess] = useState(false);
+  const [wrongReviewResolved, setWrongReviewResolved] = useState({}); // { [qIndex]: true }
+
   // States cho bảng xếp hạng (Leaderboard)
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardQuiz, setLeaderboardQuiz] = useState(null);
@@ -513,6 +522,15 @@ ${truncatedText}`;
     setSelectedOption(null);
     setUserAnswers({});
     setShowHint(false);
+    
+    // Reset wrong review states
+    setShowWrongReview(false);
+    setWrongReviewIndex(0);
+    setWrongReviewExplanations({});
+    setWrongReviewUserAnswer(null);
+    setWrongReviewSuccess(false);
+    setWrongReviewResolved({});
+    
     setView('player');
   };
 
@@ -592,6 +610,51 @@ ${truncatedText}`;
       console.error("Lỗi lấy bảng xếp hạng:", error);
     }
     setLoadingLeaderboard(false);
+  };
+
+  const handleGetAIWrongExplanation = async (wrongQIndex, questionObj, userSelectedOptText, correctOptText) => {
+    if (wrongReviewExplanations[wrongQIndex]) return;
+    setLoadingWrongReviewExplanation(true);
+
+    const apiKey = localStorage.getItem('apifree_api_key') || 'sk-psBHjnJjNm0p55Fk41tp3YwFFNfeB';
+    const promptText = `Bạn là một trợ lý giảng dạy AI xuất sắc và cực kỳ tận tâm.
+Hãy giải thích thật ngắn gọn, dễ hiểu và truyền cảm hứng bằng tiếng Việt cho học sinh biết về câu hỏi sau:
+Câu hỏi: "${questionObj.questionText}"
+Học sinh đã chọn đáp án SAI là: "${userSelectedOptText}"
+Đáp án ĐÚNG phải là: "${correctOptText}"
+
+YÊU CẦU:
+1. Hãy phân tích ngắn gọn tại sao đáp án học sinh chọn lại chưa chính xác (chỉ ra lỗ hổng tư duy).
+2. Giải thích rõ ràng, súc tích bản chất tại sao đáp án đúng mới là chuẩn xác.
+3. Đưa ra 1 mẹo học thuật/công thức ghi nhớ cực nhanh, hài hước để học sinh không bao giờ bị lừa hay làm sai câu này nữa!
+Thời lượng: Khoảng 120-150 từ, dùng các ký hiệu cute và phân đoạn rõ ràng bằng markdown.`;
+
+    try {
+      const response = await fetch('https://api.apifree.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'openai/gpt-5.5',
+          messages: [{ role: 'user', content: promptText }],
+          max_tokens: 600,
+          stream: false
+        })
+      });
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+      
+      setWrongReviewExplanations(prev => ({
+        ...prev,
+        [wrongQIndex]: content
+      }));
+    } catch (e) {
+      console.error(e);
+      alert('Không thể kết nối với AI lúc này: ' + e.message);
+    }
+    setLoadingWrongReviewExplanation(false);
   };
 
   const generateSmartHint = (qText) => {
@@ -1061,6 +1124,241 @@ ${truncatedText}`;
                 </div>
 
               </div>
+            ) : showWrongReview ? (
+              (() => {
+                const wrongQs = activeQuiz.questions.filter((q, idx) => userAnswers[idx] !== undefined && userAnswers[idx] !== q.correctIndex);
+                const currentWrongQuestion = wrongQs[wrongReviewIndex];
+                if (!currentWrongQuestion) return null;
+                
+                // Tìm vị trí gốc của câu hỏi này trong mảng activeQuiz.questions
+                const originalQIndex = activeQuiz.questions.findIndex(q => q.questionText === currentWrongQuestion.questionText);
+                const userAnswerIdx = userAnswers[originalQIndex];
+                const incorrectText = currentWrongQuestion.options[userAnswerIdx] || 'Chưa trả lời';
+                const correctText = currentWrongQuestion.options[currentWrongQuestion.correctIndex];
+                
+                const explanation = wrongReviewExplanations[originalQIndex];
+                const isResolved = wrongReviewResolved[originalQIndex];
+                
+                return (
+                  <div className="flex-1 w-full max-w-5xl mx-auto px-6 md:px-8 py-8 flex flex-col justify-between overflow-y-auto">
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-4 mb-6 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-fuchsia-100 text-fuchsia-700 px-3.5 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 shadow-sm">
+                          <Wand2 className="w-3.5 h-3.5 animate-pulse" /> Chế độ ôn tập AI
+                        </span>
+                        <span className="text-slate-500 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
+                          Câu sai {wrongReviewIndex + 1} / {wrongQs.length}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => setShowWrongReview(false)}
+                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-800 rounded-xl text-xs font-bold transition-all shadow-sm"
+                      >
+                        Quay lại bảng điểm
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start my-auto w-full">
+                      {/* CỘT TRÁI: CÂU HỎI & AI GIẢI THÍCH (7/12 cột) */}
+                      <div className="lg:col-span-7 flex flex-col space-y-6">
+                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-2">Câu hỏi gốc:</span>
+                          <h3 className="text-lg font-bold text-slate-800 leading-relaxed font-sans select-text">
+                            {currentWrongQuestion.questionText}
+                          </h3>
+                        </div>
+
+                        {/* Thẻ hiển thị Đáp án của bạn và Đáp án đúng */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-red-50/50 border border-red-100 rounded-2xl p-4 flex flex-col">
+                            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider mb-1 flex items-center gap-1">❌ Đáp án bạn chọn:</span>
+                            <p className="text-sm font-semibold text-red-950">{incorrectText}</p>
+                          </div>
+                          <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 flex flex-col">
+                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1 flex items-center gap-1">✅ Đáp án chính xác:</span>
+                            <p className="text-sm font-semibold text-emerald-950">{correctText}</p>
+                          </div>
+                        </div>
+
+                        {/* AI Giải thích */}
+                        <div className="bg-gradient-to-br from-fuchsia-50/50 to-purple-50/50 border border-fuchsia-100 rounded-3xl p-6 relative overflow-hidden shadow-sm">
+                          <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-extrabold text-fuchsia-950 text-sm flex items-center gap-1.5">
+                              <span>🧠 Phân tích chuyên sâu từ GPT-5.5:</span>
+                            </h4>
+                            {!explanation && (
+                              <button
+                                onClick={() => handleGetAIWrongExplanation(originalQIndex, currentWrongQuestion, incorrectText, correctText)}
+                                disabled={loadingWrongReviewExplanation}
+                                className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-fuchsia-200 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                              >
+                                {loadingWrongReviewExplanation ? (
+                                  <>
+                                    <div className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />
+                                    <span>AI đang phân tích...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Wand2 className="w-3.5 h-3.5 animate-bounce" />
+                                    <span>AI Giải thích ngay</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+
+                          {loadingWrongReviewExplanation && (
+                            <div className="flex flex-col items-center justify-center py-6 gap-2">
+                              <div className="animate-bounce text-3xl">💡</div>
+                              <p className="text-xs text-slate-500 font-bold animate-pulse">AI đang phân tích lựa chọn của bạn...</p>
+                            </div>
+                          )}
+
+                          {explanation ? (
+                            <div className="text-slate-700 text-sm leading-relaxed prose prose-sm select-text whitespace-pre-line bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-fuchsia-100/50 shadow-inner">
+                              {explanation}
+                            </div>
+                          ) : !loadingWrongReviewExplanation ? (
+                            <p className="text-slate-500 text-xs font-semibold italic text-center py-4">
+                              Hãy nhấn nút phía trên để AI giải thích tuần tự, vạch ra lỗ hổng tư duy và đưa ra mẹo ghi nhớ nhé!
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* CỘT PHẢI: LÀM LẠI ĐỂ NHỚ (5/12 cột) */}
+                      <div className="lg:col-span-5 flex flex-col space-y-6">
+                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col">
+                          <div className="flex justify-between items-center mb-4">
+                            <span className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+                              📝 Làm lại để khắc cốt ghi nhớ:
+                            </span>
+                            {isResolved && (
+                              <span className="bg-emerald-100 text-emerald-800 font-black px-2.5 py-1 rounded-lg text-[10px] uppercase tracking-wider animate-in zoom-in duration-300">
+                                ĐÃ NHỚ BÀI! 🎉
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="space-y-3">
+                            {currentWrongQuestion.options.map((opt, idx) => {
+                              const isCorrect = idx === currentWrongQuestion.correctIndex;
+                              const isSelected = wrongReviewUserAnswer === idx;
+                              
+                              let cardStyle = "w-full text-left p-4 rounded-2xl border transition-all duration-200 flex items-center gap-3 select-none cursor-pointer ";
+                              if (wrongReviewUserAnswer === null) {
+                                cardStyle += "bg-slate-50 border-slate-200 hover:border-fuchsia-450 hover:bg-fuchsia-50/20 text-slate-700 active:scale-[0.99]";
+                              } else if (isCorrect) {
+                                cardStyle += "bg-emerald-50 border-emerald-500 text-emerald-950 font-bold shadow-emerald-50";
+                              } else if (isSelected && !isCorrect) {
+                                cardStyle += "bg-red-50 border-red-500 text-red-950 font-bold shadow-red-50";
+                              } else {
+                                cardStyle += "bg-slate-100 border-slate-100 text-slate-400 opacity-60 pointer-events-none";
+                              }
+
+                              return (
+                                <button
+                                  key={idx}
+                                  disabled={wrongReviewUserAnswer !== null}
+                                  onClick={() => {
+                                    setWrongReviewUserAnswer(idx);
+                                    if (isCorrect) {
+                                      setWrongReviewResolved(prev => ({ ...prev, [originalQIndex]: true }));
+                                      setWrongReviewSuccess(true);
+                                      try {
+                                        const audio = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
+                                        audio.volume = 0.4;
+                                        audio.play().catch(() => {});
+                                      } catch (e) {}
+                                    } else {
+                                      setWrongReviewSuccess(false);
+                                    }
+                                  }}
+                                  className={cardStyle}
+                                >
+                                  <span className={`w-6 h-6 rounded-lg font-bold flex items-center justify-center shrink-0 text-xs ${
+                                    wrongReviewUserAnswer === null 
+                                      ? 'bg-slate-200 text-slate-500' 
+                                      : isCorrect 
+                                        ? 'bg-emerald-600 text-white' 
+                                        : isSelected 
+                                          ? 'bg-red-600 text-white' 
+                                          : 'bg-slate-200 text-slate-400'
+                                  }`}>
+                                    {['A', 'B', 'C', 'D'][idx]}
+                                  </span>
+                                  <span className="text-sm font-medium pt-0.5 leading-snug">{opt}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {wrongReviewUserAnswer !== null && (
+                            <div className="mt-4 pt-4 border-t border-slate-100 animate-in slide-in-from-top-4 duration-300">
+                              {wrongReviewSuccess ? (
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
+                                  <p className="text-emerald-800 text-sm font-black mb-1">🎉 Quá tuyệt vời! Bạn đã chọn đúng!</p>
+                                  <p className="text-[11px] text-emerald-600 font-bold">Kiến thức này hiện đã được khắc sâu vào trí nhớ của bạn!</p>
+                                </div>
+                              ) : (
+                                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
+                                  <p className="text-red-800 text-sm font-black mb-1">🫣 Vẫn chưa đúng rồi...</p>
+                                  <p className="text-[11px] text-red-600 font-bold">Hãy nghiền ngẫm phân tích của AI ở cột trái và chọn lại nhé!</p>
+                                  <button
+                                    onClick={() => setWrongReviewUserAnswer(null)}
+                                    className="mt-2 px-4 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded-xl text-xs transition-colors"
+                                  >
+                                    Chọn lại
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* KHU VỰC ĐIỀU HƯỚNG ÔN TẬP Ở CHÂN TRANG */}
+                    <div className="border-t border-slate-100 mt-8 pt-6 flex justify-between items-center w-full shrink-0">
+                      <button
+                        onClick={() => {
+                          if (wrongReviewIndex > 0) {
+                            setWrongReviewIndex(wrongReviewIndex - 1);
+                            setWrongReviewUserAnswer(null);
+                            setWrongReviewSuccess(false);
+                          }
+                        }}
+                        disabled={wrongReviewIndex === 0}
+                        className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold px-6 py-2.5 rounded-full text-sm shadow-sm transition-all disabled:opacity-40 disabled:pointer-events-none"
+                      >
+                        Trước
+                      </button>
+
+                      <div className="flex items-center gap-3">
+                        {wrongReviewIndex < wrongQs.length - 1 ? (
+                          <button
+                            onClick={() => {
+                              setWrongReviewIndex(wrongReviewIndex + 1);
+                              setWrongReviewUserAnswer(null);
+                              setWrongReviewSuccess(false);
+                            }}
+                            className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-extrabold px-6 py-2.5 rounded-full text-sm shadow-md transition-all"
+                          >
+                            Câu tiếp theo
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setShowWrongReview(false)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-6 py-2.5 rounded-full text-sm shadow-md transition-all"
+                          >
+                            Hoàn thành ôn tập
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center py-12 px-6 animate-in zoom-in duration-500 overflow-y-auto">
                 <div className="w-24 h-24 bg-gradient-to-br from-amber-300 to-orange-500 rounded-full flex items-center justify-center shadow-xl mb-6 shadow-orange-200">
@@ -1082,10 +1380,26 @@ ${truncatedText}`;
                   </div>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex flex-wrap justify-center gap-4">
                   <button onClick={() => startQuiz(activeQuiz)} className="px-6 py-3 bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-2xl transition-colors text-sm shadow-sm">
                     Làm lại
                   </button>
+                  {(() => {
+                    const wrongCount = activeQuiz.questions.filter((q, idx) => userAnswers[idx] !== undefined && userAnswers[idx] !== q.correctIndex).length;
+                    return wrongCount > 0 && (
+                      <button 
+                        onClick={() => {
+                          setWrongReviewIndex(0);
+                          setShowWrongReview(true);
+                          setWrongReviewUserAnswer(null);
+                          setWrongReviewSuccess(false);
+                        }}
+                        className="px-6 py-3 bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:shadow-lg text-white font-extrabold rounded-2xl transition-all text-sm flex items-center gap-2 shadow-md animate-pulse"
+                      >
+                        🧠 Ôn Câu Sai bằng AI ({wrongCount} câu)
+                      </button>
+                    );
+                  })()}
                   <button onClick={() => setView('hub')} className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-md transition-all text-sm">
                     Về Thư viện
                   </button>
