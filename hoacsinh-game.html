@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ôn Tập Hóa Sinh - Bác Sĩ Tài Ba</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+            min-height: 100vh;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        .card-inner {
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            backface-visibility: hidden;
+        }
+        .card-back {
+            transform: rotateY(180deg);
+        }
+        .match-btn.selected {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            transform: scale(1.05);
+        }
+        .match-btn.matched {
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.5s ease;
+        }
+        .fade-in { animation: fadeIn 0.4s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="text-slate-800 flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-4xl mx-auto">
+        <!-- Main Menu -->
+        <div id="menu-screen" class="glass-panel rounded-3xl p-8 md:p-12 text-center fade-in">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-6 shadow-inner">
+                <i class="fa-solid fa-flask text-4xl text-blue-600"></i>
+            </div>
+            <h1 class="text-4xl font-extrabold text-slate-800 mb-2 tracking-tight">Ôn Tập Hóa Sinh Lâm Sàng</h1>
+            <p class="text-slate-500 mb-10 text-lg">Học đến khi nào thuộc mới thôi!</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="startGame('flashcard')" class="group relative bg-white hover:bg-blue-50 border border-slate-200 p-6 rounded-2xl transition-all hover:shadow-lg hover:-translate-y-1 text-left flex items-start gap-4">
+                    <div class="bg-blue-100 p-3 rounded-xl group-hover:bg-blue-200 transition-colors"><i class="fa-solid fa-layer-group text-blue-600 text-xl"></i></div>
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800">Flashcard</h3>
+                        <p class="text-sm text-slate-500 mt-1">Lật thẻ để học. Thẻ chưa thuộc sẽ lặp lại.</p>
+                    </div>
+                </button>
+                <button onclick="startGame('quiz')" class="group relative bg-white hover:bg-emerald-50 border border-slate-200 p-6 rounded-2xl transition-all hover:shadow-lg hover:-translate-y-1 text-left flex items-start gap-4">
+                    <div class="bg-emerald-100 p-3 rounded-xl group-hover:bg-emerald-200 transition-colors"><i class="fa-solid fa-check-double text-emerald-600 text-xl"></i></div>
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800">Trắc Nghiệm</h3>
+                        <p class="text-sm text-slate-500 mt-1">Chọn đáp án đúng từ 4 lựa chọn.</p>
+                    </div>
+                </button>
+                <button onclick="startGame('fill')" class="group relative bg-white hover:bg-amber-50 border border-slate-200 p-6 rounded-2xl transition-all hover:shadow-lg hover:-translate-y-1 text-left flex items-start gap-4">
+                    <div class="bg-amber-100 p-3 rounded-xl group-hover:bg-amber-200 transition-colors"><i class="fa-solid fa-pen text-amber-600 text-xl"></i></div>
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800">Điền Chỗ Trống</h3>
+                        <p class="text-sm text-slate-500 mt-1">Gõ trực tiếp trị số để kiểm tra trí nhớ.</p>
+                    </div>
+                </button>
+                <button onclick="startGame('match')" class="group relative bg-white hover:bg-purple-50 border border-slate-200 p-6 rounded-2xl transition-all hover:shadow-lg hover:-translate-y-1 text-left flex items-start gap-4">
+                    <div class="bg-purple-100 p-3 rounded-xl group-hover:bg-purple-200 transition-colors"><i class="fa-solid fa-link text-purple-600 text-xl"></i></div>
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800">Nối Từ</h3>
+                        <p class="text-sm text-slate-500 mt-1">Nối chỉ số với giá trị tương ứng.</p>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="showMenu()" class="bg-white/80 hover:bg-white text-slate-600 px-4 py-2 rounded-xl shadow-sm transition-all text-sm font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i> Quay lại
+                </button>
+                <div class="bg-white/80 px-4 py-2 rounded-xl shadow-sm text-sm font-bold text-slate-700">
+                    <span id="progress-text">Câu 1 / 10</span>
+                    <div class="w-32 h-2 bg-slate-200 rounded-full mt-1 overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flashcard UI -->
+            <div id="mode-flashcard" class="hidden flex-col items-center">
+                <div class="card w-full max-w-lg h-80 perspective-1000 cursor-pointer mb-8" onclick="this.classList.toggle('flipped')">
+                    <div class="card-inner w-full h-full relative rounded-3xl shadow-xl border border-slate-100">
+                        <!-- Front -->
+                        <div class="card-front absolute w-full h-full bg-white rounded-3xl p-8 flex flex-col items-center justify-center text-center">
+                            <span class="text-sm font-bold text-blue-500 uppercase tracking-wider mb-2" id="fc-category">Danh mục</span>
+                            <h2 class="text-3xl font-extrabold text-slate-800" id="fc-name">Tên Chỉ Số</h2>
+                            <p class="text-slate-400 mt-4 text-sm animate-pulse"><i class="fa-solid fa-hand-pointer mr-1"></i> Chạm để lật</p>
+                        </div>
+                        <!-- Back -->
+                        <div class="card-back absolute w-full h-full bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 flex flex-col items-center justify-center text-center text-white">
+                            <h2 class="text-4xl font-black mb-4" id="fc-value">Giá trị</h2>
+                            <p class="text-blue-200 text-sm opacity-80" id="fc-hint">Ghi chú thêm nếu có</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-4 w-full max-w-lg">
+                    <button onclick="handleFlashcardResult(false)" class="flex-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-xmark"></i> Chưa Thuộc
+                    </button>
+                    <button onclick="handleFlashcardResult(true)" class="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 font-bold py-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check"></i> Đã Thuộc
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quiz UI -->
+            <div id="mode-quiz" class="hidden flex-col items-center w-full">
+                <div class="glass-panel w-full p-8 rounded-3xl mb-6 text-center border-t-4 border-t-emerald-500 relative overflow-hidden">
+                    <span class="text-sm font-bold text-emerald-500 uppercase tracking-wider mb-2 block" id="quiz-category">Danh mục</span>
+                    <h2 class="text-3xl font-bold text-slate-800">Trị số bình thường của <span class="text-emerald-600" id="quiz-name">Chỉ số</span> là bao nhiêu?</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full" id="quiz-options">
+                    <!-- Options injected via JS -->
+                </div>
+            </div>
+
+            <!-- Fill UI -->
+            <div id="mode-fill" class="hidden flex-col items-center w-full">
+                <div class="glass-panel w-full p-8 rounded-3xl mb-6 text-center border-t-4 border-t-amber-500">
+                    <span class="text-sm font-bold text-amber-500 uppercase tracking-wider mb-2 block" id="fill-category">Danh mục</span>
+                    <h2 class="text-2xl font-bold text-slate-800 mb-6" id="fill-question">Trị số bình thường của Natri ____ - ____ mmol/L</h2>
+                    <form onsubmit="handleFillSubmit(event)" class="flex gap-2 justify-center max-w-md mx-auto">
+                        <input type="text" id="fill-input" class="flex-1 text-center text-xl font-bold p-4 border-2 border-slate-200 rounded-2xl focus:border-amber-500 focus:outline-none transition-colors" placeholder="Nhập đáp án..." autocomplete="off">
+                        <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white px-8 font-bold rounded-2xl transition-colors">Kiểm tra</button>
+                    </form>
+                    <p id="fill-feedback" class="mt-4 font-semibold text-lg hidden"></p>
+                </div>
+            </div>
+
+            <!-- Match UI -->
+            <div id="mode-match" class="hidden flex-col items-center w-full">
+                 <div class="w-full text-center mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">Ghép Tên Chỉ Số với Trị Số đúng</h2>
+                    <p class="text-slate-500">Chọn 1 Tên và 1 Trị số tương ứng</p>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full" id="match-board">
+                    <!-- Cards injected via JS -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="hidden glass-panel rounded-3xl p-12 text-center fade-in">
+            <div class="inline-flex items-center justify-center w-24 h-24 bg-yellow-100 rounded-full mb-6 shadow-inner">
+                <i class="fa-solid fa-trophy text-5xl text-yellow-500"></i>
+            </div>
+            <h1 class="text-4xl font-extrabold text-slate-800 mb-4">Chúc Mừng!</h1>
+            <p class="text-slate-600 text-lg mb-8">Bạn đã hoàn thành và nhớ hết các chỉ số trong lượt này.</p>
+            <button onclick="showMenu()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-2xl shadow-lg transition-all active:scale-95">
+                Về Trang Chủ
+            </button>
+        </div>
+
+    </div>
+
+<script>
+const labData = [
+    { cat: 'Đường huyết', name: 'Glucose huyết tương lúc đói (FPG)', value: '< 100 mg/dL', hint: 'Tiền đái tháo đường: 100 – 125 mg/dL' },
+    { cat: 'Đường huyết', name: 'HbA1c', value: '< 5,7%', hint: 'Tiền đái tháo đường: 5,7 – 6,4%' },
+    { cat: 'Đường huyết', name: 'Nghiệm pháp dung nạp glucose (phụ nữ mang thai) - Lúc đói', value: '< 92 mg/dL', hint: '5,1 mmol/L' },
+    { cat: 'Đường huyết', name: 'Nghiệm pháp dung nạp glucose (phụ nữ mang thai) - Sau 1 giờ', value: '< 180 mg/dL', hint: '10,0 mmol/L' },
+    { cat: 'Đường huyết', name: 'Nghiệm pháp dung nạp glucose (phụ nữ mang thai) - Sau 2 giờ', value: '< 153 mg/dL', hint: '8,5 mmol/L' },
+    { cat: 'Đường huyết', name: 'Glucose niệu', value: 'Hầu như không có', hint: 'hoặc chỉ hiện diện lượng rất nhỏ' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'AST (GOT)', value: '< 40 UI/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'ALT (GPT)', value: '< 40 UI/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'LDH', value: '≤ 280 U/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'ALP (Phosphatase kiềm)', value: '25 – 85 U/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'GGT (Nữ)', value: '< 30 U/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'GGT (Nam)', value: '< 50 U/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'Albumin huyết thanh', value: '35 – 55 g/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'Globulin huyết thanh', value: '20 – 35 g/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'Protein huyết tương', value: '60 – 80 g/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'Bilirubin toàn phần (TP)', value: '0,8 – 1,2 mg/dL', hint: '5 – 17 µmol/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'Bilirubin gián tiếp (GT)', value: '0,6 – 0,8 mg/dL' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'Bilirubin trực tiếp (TT)', value: '0,2 – 0,4 mg/dL' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'Amylase huyết thanh', value: '< 220 U/L', hint: 'riêng amylase tụy < 115 U/L' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'Lipase huyết thanh', value: '< 130 U/L', hint: 'đo ở 37°C' },
+    { cat: 'Chức năng Gan - Mật - Tụy', name: 'Chỉ số INR', value: '0,8 – 1,2' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Ure máu', value: '2,5 – 7,5 mmol/L' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Creatinin (Nam)', value: '0,6 – 1,2 mg/dL' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Creatinin (Nữ)', value: '0,5 – 1,1 mg/dL' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Cystatin C', value: '0,8 – 2,5 mg/L' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Acid Uric (Nam)', value: '180 – 420 µmol/L' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Acid Uric (Nữ)', value: '150 – 360 µmol/L' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Natri (Sodium)', value: '135 – 145 mmol/L' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Kali (Potassium)', value: '3,5 – 4,5 mmol/L' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Clo (Clorua)', value: '90 – 110 mmol/L' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'Canxi máu', value: '2,2 – 2,6 mmol/L' },
+    { cat: 'Chức năng Thận và Điện giải', name: 'pH máu', value: '7,37 – 7,43' },
+    { cat: 'Lipid Máu', name: 'Cholesterol toàn phần', value: '2,9 – 5,2 mmol/L', hint: 'Ngưỡng rối loạn > 5,2 mmol/L' },
+    { cat: 'Lipid Máu', name: 'Triglycerid', value: '≤ 1,7 mmol/L', hint: '150 mg/dL' },
+    { cat: 'Lipid Máu', name: 'LDL-Cholesterol', value: '≤ 2,58 mmol/L', hint: '100 mg/dL' },
+    { cat: 'Lipid Máu', name: 'HDL-Cholesterol', value: '> 1,03 mmol/L', hint: '40 mg/dL' },
+    { cat: 'Nước tiểu', name: 'Tỉ trọng (SG)', value: '1,010 – 1,020', hint: 'dao động 1,003 – 1,030' },
+    { cat: 'Nước tiểu', name: 'pH nước tiểu', value: '4,6 – 8' },
+    { cat: 'Nước tiểu', name: 'Bạch cầu, Nitrit, Máu, Protein, Glucose, Ceton, Bilirubin', value: 'Âm tính', hint: 'hoặc không có' },
+    { cat: 'Nước tiểu', name: 'Urobilinogen', value: '0,2 – 1,2 mg/dL', hint: 'Có một lượng ít' },
+    { cat: 'Nước tiểu', name: 'Đạm niệu 24 giờ', value: '0 – 0,2 g/L/24h' },
+    { cat: 'Nội tiết và Tim mạch', name: 'TSH', value: '0,4 – 4,0 mU/L' },
+    { cat: 'Nội tiết và Tim mạch', name: 'FT4', value: '12 – 22 pmol/L' },
+    { cat: 'Nội tiết và Tim mạch', name: 'FT3', value: '1,1 – 2,7 nmol/L' },
+    { cat: 'Nội tiết và Tim mạch', name: 'Myoglobin', value: '< 85 ng/mL', hint: 'hoặc µg/L' },
+    { cat: 'Nội tiết và Tim mạch', name: 'CK-MB', value: '< 24 U/L' },
+    { cat: 'Sắt và Ferritin', name: 'Sắt huyết thanh (Nam)', value: '65 – 175 µg/dL' },
+    { cat: 'Sắt và Ferritin', name: 'Sắt huyết thanh (Nữ)', value: '50 – 170 µg/dL' },
+    { cat: 'Sắt và Ferritin', name: 'Ferritin (Nam)', value: '30 – 400 ng/mL' },
+    { cat: 'Sắt và Ferritin', name: 'Ferritin (Nữ)', value: '15 – 150 ng/mL' },
+    { cat: 'Sắt và Ferritin', name: 'NH3 máu', value: '5 – 69 mg/dL' }
+];
+
+let currentMode = '';
+let queue = [];
+let originalTotal = 0;
+let currentItem = null;
+
+// Match mode vars
+let matchCards = [];
+let selectedMatch = null;
+let matchedPairs = 0;
+
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+function showScreen(id) {
+    ['menu-screen', 'game-screen', 'result-screen'].forEach(s => document.getElementById(s).classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    document.getElementById(id).classList.add('fade-in');
+}
+
+function showMenu() {
+    showScreen('menu-screen');
+}
+
+function updateProgress() {
+    const done = originalTotal - queue.length;
+    document.getElementById('progress-text').textContent = `Đã thuộc ${done} / ${originalTotal}`;
+    document.getElementById('progress-bar').style.width = `${(done / originalTotal) * 100}%`;
+}
+
+function startGame(mode) {
+    currentMode = mode;
+    // Chọn 10 câu ngẫu nhiên cho mỗi lượt chơi để không bị ngợp
+    queue = shuffle([...labData]).slice(0, 10);
+    originalTotal = queue.length;
+    
+    ['mode-flashcard', 'mode-quiz', 'mode-fill', 'mode-match'].forEach(m => document.getElementById(m).classList.add('hidden'));
+    document.getElementById('mode-' + mode).classList.remove('hidden');
+    document.getElementById('mode-' + mode).classList.add('flex');
+    
+    showScreen('game-screen');
+    
+    if(mode === 'match') {
+        initMatchMode();
+    } else {
+        nextQuestion();
+    }
+}
+
+function nextQuestion() {
+    if (queue.length === 0) {
+        showScreen('result-screen');
+        return;
+    }
+    
+    updateProgress();
+    currentItem = queue[0];
+    
+    if (currentMode === 'flashcard') {
+        const card = document.querySelector('.card');
+        card.classList.remove('flipped');
+        document.getElementById('fc-category').textContent = currentItem.cat;
+        document.getElementById('fc-name').textContent = currentItem.name;
+        document.getElementById('fc-value').textContent = currentItem.value;
+        document.getElementById('fc-hint').textContent = currentItem.hint || '';
+    } 
+    else if (currentMode === 'quiz') {
+        document.getElementById('quiz-category').textContent = currentItem.cat;
+        document.getElementById('quiz-name').textContent = currentItem.name;
+        
+        const options = [currentItem.value];
+        while(options.length < 4) {
+            const randomItem = labData[Math.floor(Math.random() * labData.length)].value;
+            if(!options.includes(randomItem)) options.push(randomItem);
+        }
+        shuffle(options);
+        
+        const optsContainer = document.getElementById('quiz-options');
+        optsContainer.innerHTML = '';
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'w-full bg-white border-2 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 text-slate-700 p-6 rounded-2xl text-lg font-medium transition-all text-left';
+            btn.textContent = opt;
+            btn.onclick = () => handleQuizAnswer(btn, opt === currentItem.value);
+            optsContainer.appendChild(btn);
+        });
+    }
+    else if (currentMode === 'fill') {
+        document.getElementById('fill-category').textContent = currentItem.cat;
+        // Tạo chuỗi fill
+        const qText = `Trị số bình thường của ${currentItem.name} là bao nhiêu?`;
+        document.getElementById('fill-question').textContent = qText;
+        document.getElementById('fill-input').value = '';
+        document.getElementById('fill-input').focus();
+        document.getElementById('fill-feedback').classList.add('hidden');
+    }
+}
+
+function handleFlashcardResult(memorized) {
+    const item = queue.shift();
+    if (!memorized) {
+        queue.push(item); // Thêm lại vào cuối hàng chờ nếu chưa thuộc
+    }
+    nextQuestion();
+}
+
+function handleQuizAnswer(btn, isCorrect) {
+    const opts = document.getElementById('quiz-options').querySelectorAll('button');
+    opts.forEach(b => b.disabled = true);
+    
+    if (isCorrect) {
+        btn.classList.add('bg-emerald-100', 'border-emerald-500', 'text-emerald-800');
+        setTimeout(() => {
+            queue.shift(); // Xóa khỏi hàng chờ
+            nextQuestion();
+        }, 1000);
+    } else {
+        btn.classList.add('bg-red-50', 'border-red-400', 'text-red-700');
+        // Hiện đáp án đúng
+        opts.forEach(b => {
+            if(b.textContent === currentItem.value) {
+                b.classList.add('bg-emerald-100', 'border-emerald-500');
+            }
+        });
+        
+        // Chuyển câu hỏi xuống cuối
+        const item = queue.shift();
+        queue.push(item);
+        
+        setTimeout(() => {
+            nextQuestion();
+        }, 2000);
+    }
+}
+
+function handleFillSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById('fill-input').value.trim().toLowerCase();
+    const correct = currentItem.value.toLowerCase();
+    const feedback = document.getElementById('fill-feedback');
+    
+    feedback.classList.remove('hidden', 'text-emerald-500', 'text-red-500');
+    
+    // Kiểm tra tương đối (chứa các số chính)
+    const normalize = str => str.replace(/[^0-9,]/g, '');
+    const isCorrect = normalize(input) === normalize(correct) && input.length > 0;
+    
+    if (isCorrect || input === correct) {
+        feedback.textContent = "Chính xác!";
+        feedback.classList.add('text-emerald-500');
+        document.getElementById('fill-input').classList.add('border-emerald-500', 'bg-emerald-50');
+        
+        setTimeout(() => {
+            document.getElementById('fill-input').classList.remove('border-emerald-500', 'bg-emerald-50');
+            queue.shift();
+            nextQuestion();
+        }, 1000);
+    } else {
+        feedback.innerHTML = `Sai rồi. Đáp án đúng là: <span class="font-bold text-slate-800">${currentItem.value}</span>`;
+        feedback.classList.add('text-red-500');
+        document.getElementById('fill-input').classList.add('border-red-500', 'bg-red-50');
+        
+        const item = queue.shift();
+        queue.push(item);
+        
+        setTimeout(() => {
+            document.getElementById('fill-input').classList.remove('border-red-500', 'bg-red-50');
+            nextQuestion();
+        }, 2500);
+    }
+}
+
+// Nối Từ Mode
+function initMatchMode() {
+    matchCards = [];
+    matchedPairs = 0;
+    selectedMatch = null;
+    
+    // Lấy 4 cặp ngẫu nhiên để chơi trên màn hình
+    const pairs = shuffle([...labData]).slice(0, 4);
+    
+    pairs.forEach((p, idx) => {
+        matchCards.push({ id: `name-${idx}`, pairId: idx, text: p.name, type: 'name' });
+        matchCards.push({ id: `val-${idx}`, pairId: idx, text: p.value, type: 'value' });
+    });
+    
+    shuffle(matchCards);
+    renderMatchBoard();
+    updateProgressMatch(0, pairs.length);
+}
+
+function updateProgressMatch(done, total) {
+    document.getElementById('progress-text').textContent = `Đã nối ${done} / ${total}`;
+    document.getElementById('progress-bar').style.width = `${(done / total) * 100}%`;
+}
+
+function renderMatchBoard() {
+    const board = document.getElementById('match-board');
+    board.innerHTML = '';
+    matchCards.forEach(card => {
+        const btn = document.createElement('button');
+        btn.id = card.id;
+        btn.className = `match-btn w-full h-32 bg-white border-2 border-slate-200 hover:border-purple-400 p-4 rounded-2xl text-base md:text-lg font-semibold transition-all flex items-center justify-center text-center shadow-sm text-slate-700 ${card.matched ? 'matched' : ''}`;
+        btn.textContent = card.text;
+        btn.onclick = () => handleMatchClick(card, btn);
+        board.appendChild(btn);
+    });
+}
+
+function handleMatchClick(card, btn) {
+    if (card.matched) return;
+    
+    if (!selectedMatch) {
+        selectedMatch = { card, btn };
+        btn.classList.add('selected');
+    } else {
+        if (selectedMatch.card.id === card.id) {
+            // Deselect
+            btn.classList.remove('selected');
+            selectedMatch = null;
+            return;
+        }
+        
+        // Kiểm tra ghép đúng
+        if (selectedMatch.card.pairId === card.pairId && selectedMatch.card.type !== card.type) {
+            // Đúng
+            btn.classList.add('bg-emerald-100', 'border-emerald-500', 'text-emerald-800');
+            selectedMatch.btn.classList.remove('selected');
+            selectedMatch.btn.classList.add('bg-emerald-100', 'border-emerald-500', 'text-emerald-800');
+            
+            card.matched = true;
+            selectedMatch.card.matched = true;
+            matchedPairs++;
+            updateProgressMatch(matchedPairs, 4);
+            
+            setTimeout(() => {
+                btn.classList.add('matched');
+                selectedMatch.btn.classList.add('matched');
+                selectedMatch = null;
+                
+                if (matchedPairs === 4) {
+                    setTimeout(() => {
+                        showScreen('result-screen');
+                    }, 500);
+                }
+            }, 600);
+        } else {
+            // Sai
+            btn.classList.add('bg-red-50', 'border-red-400', 'text-red-700', 'shake');
+            selectedMatch.btn.classList.remove('selected');
+            selectedMatch.btn.classList.add('bg-red-50', 'border-red-400', 'text-red-700', 'shake');
+            
+            const prev = selectedMatch.btn;
+            selectedMatch = null;
+            
+            setTimeout(() => {
+                btn.classList.remove('bg-red-50', 'border-red-400', 'text-red-700', 'shake');
+                prev.classList.remove('bg-red-50', 'border-red-400', 'text-red-700', 'shake');
+            }, 800);
+        }
+    }
+}
+</script>
+</body>
+</html>

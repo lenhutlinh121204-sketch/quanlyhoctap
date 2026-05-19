@@ -4,13 +4,13 @@ import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAQZtUp8YgwEZWNU_RCsgF19PFr7njWOCw",
-  authDomain: "mangoteamhoctuvung.firebaseapp.com",
-  projectId: "mangoteamhoctuvung",
-  storageBucket: "mangoteamhoctuvung.firebasestorage.app",
-  messagingSenderId: "67729204338",
-  appId: "1:67729204338:web:7161222f42214c06b60eeb",
-  measurementId: "G-HN5NHGBNVH"
+  apiKey: "AIzaSyB89t_hUV6RMv0DuHyZociVaE05WU1bALs",
+  authDomain: "mangoteamapphoctap.firebaseapp.com",
+  projectId: "mangoteamapphoctap",
+  storageBucket: "mangoteamapphoctap.firebasestorage.app",
+  messagingSenderId: "334124494064",
+  appId: "1:334124494064:web:316db0c3880ffd5f3da635",
+  measurementId: "G-BE2K559WMF"
 };
 
 // Initialize Firebase

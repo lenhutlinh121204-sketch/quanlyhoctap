@@ -1,17 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  CheckCircle, Circle, Trash2, Calendar, BookOpen, 
+  CheckCircle, Circle, Trash2, Calendar, BookOpen, Stethoscope, 
   Clock, Plus, BarChart3, Target, Award, BookMarked,
   Play, Pause, RotateCcw, Coffee, BrainCircuit, Sparkles, 
   Settings, Music, Bell, ListTree, CornerDownRight, Send,
-  Users, MessageCircle, LogOut, Edit2, Check, X
+  Users, MessageCircle, LogOut, Edit2, Check, X, Hash, DoorOpen
 } from 'lucide-react';
 import io from 'socket.io-client';
 import { db } from './firebase';
 import {
   collection, addDoc, query, where, onSnapshot, updateDoc, doc,
-  serverTimestamp, orderBy, limit, getDocs, deleteDoc
+  serverTimestamp, orderBy, limit, getDocs, deleteDoc, setDoc, increment
 } from 'firebase/firestore';
+import BioChemQuiz from './BioChemQuiz.jsx';
+import Timetable from './Timetable.jsx';
+import CommunityQuiz from './CommunityQuiz.jsx';
+import FlashcardsHub from './FlashcardsHub.jsx';
+import bookReadGif from './Book Read GIF.gif';
+import girlEatGif from './Girl Eat GIF.gif';
+import demonSlayerGif from './Demonslayer Kimetsunoyaiba GIF by KonnichiwaFestival.gif';
+import giphyGif from './giphy.gif';
+import gifGif from './gif.gif';
+import kimetsuSlayeriQiyiGif from './Kimetsu No Yaiba Demon Slayer GIF by iQiyi.gif';
+import kimetsuSnakeXboxGif from './Kimetsu No Yaiba Snake GIF by Xbox.gif';
+import gif1Gif from './gif (1).gif';
+import kimetsuSlayerXboxGif from './Kimetsu No Yaiba Demon Slayer GIF by Xbox.gif';
+import kimetsuWaterXboxGif from './Kimetsu No Yaiba Water GIF by Xbox.gif';
+import lemmeThinkGif from './Lemme Think GIF.gif';
+import nightSleepingGif from './Night Sleeping GIF.gif';
+import ohNoFacepalmGif from './Oh No Facepalm GIF.gif';
+import orekiHoutarouGif from './oreki houtarou GIF.gif';
+import prepareLetsGoGif from './Prepare Lets Go GIF by Xbox.gif';
+import scrollingLateNightGif from './Scrolling Late Night GIF.gif';
+import tiredCatGif from './Tired Cat GIF.gif';
+import whiteCatGif from './White Cat GIF.gif';
+
+const sendSoundAudio = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
+const receiveSoundAudio = new Audio('https://actions.google.com/sounds/v1/alarms/pop_up_notification.ogg');
+
+const playChatSound = (type) => {
+  try {
+    if (type === 'send') {
+      sendSoundAudio.currentTime = 0;
+      sendSoundAudio.volume = 0.4;
+      sendSoundAudio.play().catch(() => {});
+    } else {
+      receiveSoundAudio.currentTime = 0;
+      receiveSoundAudio.volume = 0.6;
+      receiveSoundAudio.play().catch(() => {});
+    }
+  } catch (e) {}
+};
 
 export default function App() {
   // --- ANIMAL NICKNAMES ---
@@ -115,13 +154,59 @@ export default function App() {
   const [workMinutes, setWorkMinutes] = useState(25);
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [pomodoroMode, setPomodoroMode] = useState('work'); // 'work' hoặc 'break'
+  const [pomodoroMascot, setPomodoroMascot] = useState(() => {
+    return localStorage.getItem('exam_master_mascot') || 'auto';
+  });
+
+  const [currentGifIndex, setCurrentGifIndex] = useState(0);
+  const ALL_GIFS = [
+    bookReadGif,
+    girlEatGif,
+    demonSlayerGif,
+    giphyGif,
+    gifGif,
+    kimetsuSlayeriQiyiGif,
+    kimetsuSnakeXboxGif,
+    gif1Gif,
+    kimetsuSlayerXboxGif,
+    kimetsuWaterXboxGif,
+    lemmeThinkGif,
+    nightSleepingGif,
+    ohNoFacepalmGif,
+    orekiHoutarouGif,
+    prepareLetsGoGif,
+    scrollingLateNightGif,
+    tiredCatGif,
+    whiteCatGif,
+  ];
+
+  useEffect(() => {
+    if (pomodoroMascot === 'rotate') {
+      const interval = setInterval(() => {
+        setCurrentGifIndex(prev => (prev + 1) % ALL_GIFS.length);
+      }, 15000); // Tự động chuyển đổi mỗi 15 giây
+      return () => clearInterval(interval);
+    }
+  }, [pomodoroMascot, ALL_GIFS.length]);
+
   const [pomodoroTime, setPomodoroTime] = useState(workMinutes * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isEditingPomodoro, setIsEditingPomodoro] = useState(false);
+  const [showBioChem, setShowBioChem] = useState(false);
+  const [showTimetable, setShowTimetable] = useState(false);
+  const [showCommunityQuiz, setShowCommunityQuiz] = useState(false);
+  const [showFlashcards, setShowFlashcards] = useState(false);
   const [isAutoStart, setIsAutoStart] = useState(true);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [videoId, setVideoId] = useState('');
-  const [totalStudySeconds, setTotalStudySeconds] = useState(0);
+  const [totalStudySeconds, setTotalStudySeconds] = useState(() => {
+    return parseInt(localStorage.getItem('totalStudySeconds') || '0', 10);
+  });
+
+  // States cho Bảng xếp hạng Học tập (Study Leaderboard)
+  const [showStudyLeaderboard, setShowStudyLeaderboard] = useState(false);
+  const [studyLeaderboardScores, setStudyLeaderboardScores] = useState([]);
+  const [loadingStudyLeaderboard, setLoadingStudyLeaderboard] = useState(false);
   const [isAnimePomodoroMode, setIsAnimePomodoroMode] = useState(false);
   const [animeVideoId] = useState('98ZHcjHbXAs'); // Anime video ID
 
@@ -133,6 +218,7 @@ export default function App() {
   const [userNickname, setUserNickname] = useState(() => {
     return localStorage.getItem('exam_master_nickname') || '';
   });
+  const [userStatus, setUserStatus] = useState('Đang học bài');
   const [userAnimal, setUserAnimal] = useState(() => {
     return localStorage.getItem('exam_master_animal') || DEFAULT_ANIMAL;
   });
@@ -143,6 +229,126 @@ export default function App() {
   const [newMessage, setNewMessage] = useState('');
   const [usersOnline, setUsersOnline] = useState([]);
   const [showChat, setShowChat] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [toastNotification, setToastNotification] = useState(null);
+  const showChatRef = useRef(showChat);
+
+  // --- STATE GAMIFICATION (CAP BAC, XP, HUY HIEU, PET) ---
+  const [userXP, setUserXP] = useState(() => {
+    return parseInt(localStorage.getItem('exam_master_xp') || '0', 10);
+  });
+  const [userLevel, setUserLevel] = useState(() => {
+    return parseInt(localStorage.getItem('exam_master_level') || '1', 10);
+  });
+  const [userBadges, setUserBadges] = useState(() => {
+    const saved = localStorage.getItem('exam_master_badges');
+    return saved ? saved.split(',').filter(Boolean) : [];
+  });
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+  const [lastLevelUp, setLastLevelUp] = useState(1);
+  const [toastBadge, setToastBadge] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem('exam_master_xp', userXP.toString());
+  }, [userXP]);
+
+  useEffect(() => {
+    localStorage.setItem('exam_master_level', userLevel.toString());
+  }, [userLevel]);
+
+  useEffect(() => {
+    localStorage.setItem('exam_master_badges', userBadges.join(','));
+  }, [userBadges]);
+
+  const addXP = (amount) => {
+    if (!localStorage.getItem('exam_master_nickname')) return;
+    setUserXP(prevXP => {
+      let newXP = prevXP + amount;
+      let currentLevel = userLevel;
+      let xpNeeded = currentLevel * 100;
+      let didLevelUp = false;
+
+      while (newXP >= xpNeeded) {
+        newXP -= xpNeeded;
+        currentLevel += 1;
+        xpNeeded = currentLevel * 100;
+        didLevelUp = true;
+      }
+
+      if (didLevelUp) {
+        setUserLevel(currentLevel);
+        setLastLevelUp(currentLevel);
+        setShowLevelUpModal(true);
+        // Âm thanh thăng cấp vui nhộn
+        try {
+          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2019/2019-84.wav');
+          audio.volume = 0.5;
+          audio.play().catch(() => {});
+        } catch (e) {}
+        addActivityToFeed('level_up', `đã xuất sắc thăng lên Cấp độ ${currentLevel}! 🎉`);
+      }
+      return newXP;
+    });
+  };
+
+  const unlockBadge = (badgeName) => {
+    setUserBadges(prev => {
+      if (prev.includes(badgeName)) return prev;
+      const updated = [...prev, badgeName];
+      setToastBadge(badgeName);
+      setTimeout(() => setToastBadge(null), 5000);
+      
+      // Âm thanh mở huy hiệu
+      try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2017/2017-84.wav');
+        audio.volume = 0.5;
+        audio.play().catch(() => {});
+      } catch (e) {}
+      
+      addActivityToFeed('badge', `đã xuất sắc mở khóa Huy hiệu danh giá: [${badgeName}]! 🏆`);
+      return updated;
+    });
+  };
+
+  const [pomodoroSessionCount, setPomodoroSessionCount] = useState(0);
+  const [groupChallenge, setGroupChallenge] = useState({
+    secondsEarned: 0,
+    contributors: {}
+  });
+
+  useEffect(() => {
+    if (!currentRoom) return;
+    const docRef = doc(db, 'group_challenges', currentRoom);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setGroupChallenge(docSnap.data());
+      } else {
+        setDoc(docRef, {
+          secondsEarned: 0,
+          contributors: {},
+          lastUpdated: serverTimestamp()
+        }).catch(err => console.error("Lỗi khởi tạo thử thách nhóm:", err));
+      }
+    }, (error) => {
+      console.error("Lỗi lắng nghe thử thách nhóm:", error);
+    });
+    return () => unsubscribe();
+  }, [currentRoom]);
+
+  useEffect(() => {
+    showChatRef.current = showChat;
+    if (showChat) {
+      setUnreadCount(0);
+    }
+  }, [showChat]);
+
+  useEffect(() => {
+    if (toastNotification) {
+      const timer = setTimeout(() => setToastNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastNotification]);
+
   const [userId, setUserId] = useState(() => {
     let saved = localStorage.getItem('exam_master_user_id');
     if (!saved) {
@@ -158,7 +364,86 @@ export default function App() {
   const [socketId, setSocketId] = useState('');
   const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
+  // --- STATE STUDY ROOMS ---
+  const [currentRoom, setCurrentRoom] = useState(() => {
+    return localStorage.getItem('exam_master_room') || 'global';
+  });
+  const [showChangeRoom, setShowChangeRoom] = useState(false);
+  const [roomInputModal, setRoomInputModal] = useState('');
+  const [activeRooms, setActiveRooms] = useState([]);
+
   const priorities = ['Cao', 'Trung bình', 'Thấp'];
+
+  // --- STATE SMART SCRATCHPAD & STUDY MOOD ---
+  const [scratchpadText, setScratchpadText] = useState(() => {
+    return localStorage.getItem('exam_master_scratchpad') || '';
+  });
+  const [scratchpadColor, setScratchpadColor] = useState(() => {
+    return localStorage.getItem('exam_master_scratchpad_color') || 'yellow';
+  });
+  const [studyMood, setStudyMood] = useState(() => {
+    return localStorage.getItem('exam_master_study_mood') || '🌟';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('exam_master_scratchpad', scratchpadText);
+  }, [scratchpadText]);
+
+  useEffect(() => {
+    localStorage.setItem('exam_master_scratchpad_color', scratchpadColor);
+  }, [scratchpadColor]);
+
+  useEffect(() => {
+    localStorage.setItem('exam_master_study_mood', studyMood);
+  }, [studyMood]);
+
+  const MOODS = [
+    { emoji: '🌟', label: 'Tập trung', color: 'bg-indigo-100 text-indigo-700', quote: 'Trạng thái tuyệt vời! Hãy giữ vững ngọn lửa này để chinh phục mọi mục tiêu nhé! 🔥' },
+    { emoji: '☕', label: 'Thư thả', color: 'bg-emerald-100 text-emerald-700', quote: 'Học tập là một hành trình dài. Sự thư thái hôm nay chính là năng lượng cho ngày mai! 🌱' },
+    { emoji: '🎯', label: 'Quyết tâm', color: 'bg-rose-100 text-rose-700', quote: 'Mục tiêu thi đỗ đang ở ngay trước mắt bạn rồi. Cố gắng thêm một chút nữa nào! 💪' },
+    { emoji: '😵', label: 'Mệt mỏi', color: 'bg-amber-100 text-amber-700', quote: 'Bạn đã nỗ lực rất nhiều rồi. Hãy nhắm mắt thư giãn 5 phút, uống nước hoặc đi dạo nhé! 🥤' },
+    { emoji: '😰', label: 'Lo lắng', color: 'bg-purple-100 text-purple-700', quote: 'Đừng quá lo lắng! Chia nhỏ nhiệm vụ lớn thành các bước nhỏ và xử lý từng phần một nha. Bạn làm được mà! 💖' },
+  ];
+
+  const currentMoodObj = MOODS.find(m => m.emoji === studyMood) || MOODS[0];
+
+  // --- STATE DAILY ACTIVITY FEED ---
+  const [activities, setActivities] = useState([]);
+  const [activityFilter, setActivityFilter] = useState('all'); // 'all', 'task', 'quiz', 'join'
+
+  const addActivityToFeed = async (type, details) => {
+    if (!userNickname) return;
+    try {
+      const emoji = ANIMAL_EMOJIS[userAnimal] || '🐾';
+      await addDoc(collection(db, 'activity_feed'), {
+        nickname: userNickname,
+        emoji: emoji,
+        type: type,
+        details: details || '',
+        timestamp: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Lỗi khi thêm tin hoạt động:", error);
+    }
+  };
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'activity_feed'),
+      orderBy('timestamp', 'desc'),
+      limit(30)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setActivities(list);
+    }, (error) => {
+      console.error("Lỗi khi lắng nghe bảng tin:", error);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // --- LOGIC TÁC VỤ (TÍNH TOÁN TRƯỚC) ---
   const totalTasks = tasks.length;
@@ -184,17 +469,20 @@ export default function App() {
       setSocketConnected(true);
       setSocketId(newSocket.id);
 
-      // Gửi thông tin user join
+      // Gửi thông tin user join (kèm roomId)
       newSocket.emit('user-join', {
         nickname: userNickname,
         animalName: userAnimal,
         emoji: ANIMAL_EMOJIS[userAnimal],
         progress: Math.round((completedTasks / totalTasks) * 100) || 0,
+        roomId: currentRoom,
+        statusText: userStatus,
+        isFocusing: isTimerRunning && pomodoroMode === 'work'
       });
 
-      // Load lịch sử tin nhắn
+      // Load lịch sử tin nhắn theo phòng
       try {
-        const res = await fetch(`${SOCKET_SERVER_URL}/api/messages`);
+        const res = await fetch(`${SOCKET_SERVER_URL}/api/rooms/${currentRoom}/messages`);
         if (res.ok && isActive) {
           const history = await res.json();
           setMessages(history);
@@ -202,6 +490,12 @@ export default function App() {
       } catch (error) {
         console.error('❌ Lỗi khi load lịch sử tin nhắn:', error);
       }
+
+      // Load danh sách phòng đang hoạt động
+      try {
+        const roomsRes = await fetch(`${SOCKET_SERVER_URL}/api/rooms`);
+        if (roomsRes.ok && isActive) setActiveRooms(await roomsRes.json());
+      } catch (_) {}
     });
 
     // Lắng nghe ngắt kết nối
@@ -215,6 +509,20 @@ export default function App() {
     newSocket.on('receive-message', (message) => {
       console.log('📨 New message:', message);
       setMessages(prev => [...prev, message]);
+
+      if (message.userId !== newSocket.id) {
+        playChatSound('receive');
+        
+        if (!showChatRef.current) {
+          setUnreadCount(prev => prev + 1);
+          setToastNotification({
+            id: Date.now(),
+            sender: message.nickname,
+            emoji: message.emoji || '💬',
+            text: message.message || message.text
+          });
+        }
+      }
 
       // Desktop notification cho tin nhắn mới từ người khác
       if (message.userId !== newSocket.id && 'Notification' in window && Notification.permission === 'granted') {
@@ -365,7 +673,7 @@ export default function App() {
   };
 
   // --- LOGIC CHAT ONLINE & NICKNAME ---
-  const handleSetNickname = (nickname, animal) => {
+  const handleSetNickname = async (nickname, animal) => {
     if (!nickname.trim()) return;
     
     localStorage.setItem('exam_master_nickname', nickname);
@@ -373,6 +681,19 @@ export default function App() {
     setUserNickname(nickname);
     setUserAnimal(animal);
     setIsNicknameSet(true);
+
+    try {
+      const emoji = ANIMAL_EMOJIS[animal] || '🐾';
+      await addDoc(collection(db, 'activity_feed'), {
+        nickname: nickname,
+        emoji: emoji,
+        type: 'join',
+        details: 'Vừa tham gia cộng đồng!',
+        timestamp: serverTimestamp()
+      });
+    } catch (e) {
+      console.error("Lỗi log activity join:", e);
+    }
     
     // Yêu cầu permission thông báo
     if ('Notification' in window && Notification.permission === 'default') {
@@ -385,17 +706,51 @@ export default function App() {
     if (!newMessage.trim() || !socket || !socketConnected) return;
 
     try {
-      // Gửi tin nhắn qua Socket.IO
       socket.emit('send-message', {
         text: newMessage,
         timestamp: Date.now(),
       });
-
+      playChatSound('send');
       setNewMessage('');
     } catch (error) {
       console.error('Lỗi khi gửi tin nhắn:', error);
       alert('❌ Không thể gửi tin nhắn. Vui lòng kiểm tra kết nối.');
     }
+  };
+
+  // --- LOGIC ĐỔI PHÒNG ---
+  const handleChangeRoom = async (newRoom) => {
+    const roomId = (newRoom || '').trim() || 'global';
+    if (roomId === currentRoom) {
+      setShowChangeRoom(false);
+      return;
+    }
+    localStorage.setItem('exam_master_room', roomId);
+    setCurrentRoom(roomId);
+    setMessages([]);
+    setShowChangeRoom(false);
+    setRoomInputModal('');
+
+    if (socket && socketConnected) {
+      socket.emit('user-join', {
+        nickname: userNickname,
+        animalName: userAnimal,
+        emoji: ANIMAL_EMOJIS[userAnimal],
+        progress: Math.round((completedTasks / totalTasks) * 100) || 0,
+        roomId,
+      });
+      try {
+        const res = await fetch(`${SOCKET_SERVER_URL}/api/rooms/${roomId}/messages`);
+        if (res.ok) setMessages(await res.json());
+      } catch (_) {}
+    }
+  };
+
+  const fetchActiveRooms = async () => {
+    try {
+      const res = await fetch(`${SOCKET_SERVER_URL}/api/rooms`);
+      if (res.ok) setActiveRooms(await res.json());
+    } catch (_) {}
   };
 
   // Update user online status via Socket.IO
@@ -406,6 +761,8 @@ export default function App() {
       socket.emit('update-status', {
         online: true,
         progress: Math.round((completedTasks / totalTasks) * 100) || 0,
+        statusText: userStatus,
+        isFocusing: isTimerRunning && pomodoroMode === 'work'
       });
     };
 
@@ -413,7 +770,7 @@ export default function App() {
     const interval = setInterval(updateUserStatus, 30000); // Update mỗi 30 giây
 
     return () => clearInterval(interval);
-  }, [socket, socketConnected, completedTasks, totalTasks]);
+  }, [socket, socketConnected, completedTasks, totalTasks, userStatus, isTimerRunning, pomodoroMode]);
 
   // --- LOGIC POMODORO ---
   const playAlarmSound = () => {
@@ -432,12 +789,27 @@ export default function App() {
       interval = setInterval(() => {
         setPomodoroTime(prev => prev - 1);
         if (pomodoroMode === 'work') {
-          setTotalStudySeconds(prev => prev + 1);
+          setTotalStudySeconds(prev => {
+            const newSeconds = prev + 1;
+            localStorage.setItem('totalStudySeconds', newSeconds);
+            return newSeconds;
+          });
         }
       }, 1000);
     } else if (isTimerRunning && pomodoroTime === 0) {
       playAlarmSound();
       
+      if (pomodoroMode === 'work') {
+        addXP(50);
+        setPomodoroSessionCount(prev => {
+          const next = prev + 1;
+          if (next >= 4) {
+            unlockBadge('Pomodoro Master');
+          }
+          return next;
+        });
+      }
+
       const nextMode = pomodoroMode === 'work' ? 'break' : 'work';
       setPomodoroMode(nextMode);
       setPomodoroTime(nextMode === 'work' ? workMinutes * 60 : breakMinutes * 60);
@@ -448,6 +820,56 @@ export default function App() {
     }
     return () => clearInterval(interval);
   }, [isTimerRunning, pomodoroTime, pomodoroMode, workMinutes, breakMinutes, isAutoStart]);
+
+  // Tự động đồng bộ thời gian học lên Firebase và Thử thách đồng đội mỗi 10 giây học thực tế
+  useEffect(() => {
+    if (isTimerRunning && pomodoroMode === 'work' && userNickname) {
+      if (totalStudySeconds > 0 && totalStudySeconds % 10 === 0) {
+        const syncStudyTime = async () => {
+          try {
+            const docRef = doc(db, 'user_study_times', userNickname);
+            await setDoc(docRef, {
+              nickname: userNickname,
+              totalSeconds: totalStudySeconds,
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+
+            // Đồng bộ Thử thách nhóm
+            if (currentRoom) {
+              const groupChallengeRef = doc(db, 'group_challenges', currentRoom);
+              await setDoc(groupChallengeRef, {
+                secondsEarned: increment(10),
+                [`contributors.${userNickname}`]: increment(10),
+                lastUpdated: serverTimestamp()
+              }, { merge: true });
+            }
+          } catch (error) {
+            console.error("Lỗi đồng bộ thời gian học:", error);
+          }
+        };
+        syncStudyTime();
+      }
+    }
+  }, [totalStudySeconds, isTimerRunning, pomodoroMode, userNickname, currentRoom]);
+
+  // Đồng bộ thời gian học từ local lên Firebase lúc khởi động hoặc đổi nickname
+  useEffect(() => {
+    if (userNickname && totalStudySeconds > 0) {
+      const syncInitialTime = async () => {
+        try {
+          const docRef = doc(db, 'user_study_times', userNickname);
+          await setDoc(docRef, {
+            nickname: userNickname,
+            totalSeconds: totalStudySeconds,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (error) {
+          console.error("Lỗi đồng bộ ban đầu:", error);
+        }
+      };
+      syncInitialTime();
+    }
+  }, [userNickname]);
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -462,6 +884,24 @@ export default function App() {
     return `${m} phút`;
   };
 
+  const fetchStudyLeaderboard = async () => {
+    setLoadingStudyLeaderboard(true);
+    setShowStudyLeaderboard(true);
+    try {
+      const q = query(
+        collection(db, 'user_study_times'),
+        orderBy('totalSeconds', 'desc'),
+        limit(15)
+      );
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setStudyLeaderboardScores(data);
+    } catch (error) {
+      console.error("Lỗi lấy BXH học tập:", error);
+    }
+    setLoadingStudyLeaderboard(false);
+  };
+
   const switchPomodoroMode = (mode) => {
     setPomodoroMode(mode);
     setIsTimerRunning(false);
@@ -474,6 +914,7 @@ export default function App() {
   };
 
   const applyCustomTimes = () => {
+    localStorage.setItem('exam_master_mascot', pomodoroMascot);
     setIsEditingPomodoro(false);
     resetPomodoro();
   };
@@ -490,6 +931,27 @@ export default function App() {
   };
 
   // --- LOGIC TÁC VỤ (ĐÃ TÍNH TOÁN BÊN TRÊN) ---
+  const getRelativeTime = (timestamp) => {
+    if (!timestamp) return 'Vừa xong';
+    const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
+    const diffMs = Date.now() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    
+    if (diffMins < 1) return 'Vừa xong';
+    if (diffMins < 60) return `${diffMins} phút trước`;
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    return date.toLocaleDateString('vi-VN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const filteredActivities = activities.filter(act => {
+    if (activityFilter === 'all') return true;
+    if (activityFilter === 'task') return act.type === 'task_complete';
+    if (activityFilter === 'quiz') return act.type === 'quiz_create' || act.type === 'flashcard_create';
+    if (activityFilter === 'join') return act.type === 'join';
+    return true;
+  });
+
   const progressPercentage = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
   const handleAddTask = (e) => {
@@ -511,7 +973,17 @@ export default function App() {
   };
 
   const toggleTask = (id) => {
-    setTasks(tasks.map(task => task.id === id ? { ...task, completed: !task.completed } : task));
+    setTasks(tasks.map(task => {
+      if (task.id === id) {
+        const newCompleted = !task.completed;
+        if (newCompleted && userNickname) {
+          addActivityToFeed('task_complete', task.title);
+          addXP(10);
+        }
+        return { ...task, completed: newCompleted };
+      }
+      return task;
+    }));
   };
 
   const deleteTask = (id) => setTasks(tasks.filter(task => task.id !== id));
@@ -545,7 +1017,16 @@ export default function App() {
       if (task.id === taskId) {
         return {
           ...task,
-          subtasks: task.subtasks.map(st => st.id === subtaskId ? { ...st, completed: !st.completed } : st)
+          subtasks: task.subtasks.map(st => {
+            if (st.id === subtaskId) {
+              const nextCompleted = !st.completed;
+              if (nextCompleted && userNickname) {
+                addXP(5);
+              }
+              return { ...st, completed: nextCompleted };
+            }
+            return st;
+          })
         };
       }
       return task;
@@ -563,6 +1044,41 @@ export default function App() {
       return task;
     }));
   };
+
+  const BADGES_LIST = [
+    { name: 'Chiến thần Hóa Sinh', emoji: '🍎', desc: 'Trả lời đúng liên tục 15 câu hóa sinh.' },
+    { name: 'Pomodoro Master', emoji: '🍅', desc: 'Hoàn thành 4 chu kỳ Pomodoro liên tục không dừng.' },
+    { name: 'Người kiến tạo', emoji: '🤝', desc: 'Đóng góp 3 bộ đề trắc nghiệm cho cộng đồng.' }
+  ];
+
+  const getPetDisplay = () => {
+    let petMascot = '🥚';
+    let petStage = 'Ấu Trùng Trứng Pet';
+    if (userLevel >= 3 && userLevel <= 5) {
+      petMascot = '🐰';
+      petStage = 'Thỏ Thiếu Niên Cute';
+    } else if (userLevel >= 6) {
+      petMascot = '🐇⚔️';
+      petStage = 'Chiến Binh Thỏ Thần';
+    }
+
+    let petStatus = 'Đang nghỉ ngơi';
+    let petActionEmoji = '💤';
+    if (isTimerRunning && pomodoroMode === 'work') {
+      petActionEmoji = '📚✍️';
+      petStatus = 'Đang cùng bạn học tập cực kỳ chăm chỉ';
+    } else if (isTimerRunning && pomodoroMode === 'break') {
+      petActionEmoji = '☕🌱';
+      petStatus = 'Đang cùng bạn thưởng trà nghỉ ngơi';
+    } else {
+      petActionEmoji = '💤';
+      petStatus = 'Đang ngủ say nạp năng lượng';
+    }
+
+    return { mascot: petMascot, stage: petStage, status: petStatus, actionEmoji: petActionEmoji };
+  };
+
+  const petInfo = getPetDisplay();
 
   // TÍNH TOÁN THỐNG KÊ RIÊNG CHO TỪNG MÔN HỌC
   const subjectStats = tasks.reduce((acc, task) => {
@@ -601,9 +1117,93 @@ export default function App() {
     return <div className="w-2 h-2 rounded-full bg-slate-300"></div>;
   };
 
+  if (showTimetable) {
+    return <Timetable onClose={() => setShowTimetable(false)} />;
+  }
+
+  if (showCommunityQuiz) {
+    return <CommunityQuiz onClose={() => setShowCommunityQuiz(false)} nickname={userNickname} onActivityCreated={addActivityToFeed} addXP={addXP} unlockBadge={unlockBadge} />;
+  }
+
+  if (showBioChem) {
+    return <BioChemQuiz onClose={() => setShowBioChem(false)} addXP={addXP} unlockBadge={unlockBadge} />;
+  }
+
+  if (showFlashcards) {
+    return <FlashcardsHub onClose={() => setShowFlashcards(false)} nickname={userNickname} onActivityCreated={addActivityToFeed} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50 font-sans text-slate-800 p-4 md:p-6 lg:p-8">
       
+      {/* TOAST ACHIEVEMENT HUY HIỆU */}
+      {toastBadge && (
+        <div className="fixed top-4 right-4 z-[999] bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-2xl p-4 shadow-2xl flex items-center gap-3 border border-amber-300 animate-bounce max-w-sm">
+          <div className="text-3xl">🏆</div>
+          <div>
+            <div className="text-xs font-black uppercase tracking-widest opacity-80">Thành Tựu Mới!</div>
+            <div className="font-bold text-sm">Bạn đã mở khóa huy hiệu:</div>
+            <div className="font-black text-lg underline">{toastBadge}</div>
+          </div>
+        </div>
+      )}
+
+      {/* LEVEL UP MODAL CỰC KỲ LỘNG LẪY */}
+      {showLevelUpModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-indigo-900 to-purple-900 text-white rounded-3xl p-8 max-w-md w-full border border-indigo-400 shadow-2xl relative text-center overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* Pháo hoa giả lập bằng css */}
+            <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none overflow-hidden animate-[pulse_3s_infinite]">
+              <div className="absolute top-10 left-10 w-2 h-2 bg-yellow-400 rounded-full animate-ping"></div>
+              <div className="absolute top-20 right-10 w-3 h-3 bg-pink-500 rounded-full animate-ping delay-300"></div>
+              <div className="absolute bottom-20 left-20 w-2 h-2 bg-cyan-400 rounded-full animate-ping delay-700"></div>
+            </div>
+            
+            <div className="relative z-10 space-y-6">
+              <div className="text-7xl animate-[bounce_1.5s_infinite]">🎉</div>
+              
+              <div className="space-y-2">
+                <h3 className="text-3xl font-black bg-gradient-to-r from-amber-300 to-yellow-300 bg-clip-text text-transparent uppercase tracking-wider">
+                  Thăng Cấp!
+                </h3>
+                <p className="text-sm font-semibold text-indigo-200">
+                  Chúc mừng {userNickname || 'Học viên'} đã vươn lên tầm cao mới!
+                </p>
+              </div>
+
+              <div className="flex justify-center items-center gap-6 py-4">
+                <div className="bg-white/10 rounded-2xl p-4 border border-white/10 text-center w-24">
+                  <div className="text-xs text-slate-300 font-bold uppercase">Trước</div>
+                  <div className="text-3xl font-black text-slate-400">{lastLevelUp - 1}</div>
+                </div>
+                <div className="text-3xl">➡️</div>
+                <div className="bg-amber-500/20 rounded-2xl p-4 border border-amber-400/30 text-center w-24 animate-[pulse_2s_infinite]">
+                  <div className="text-xs text-amber-300 font-bold uppercase">Sau</div>
+                  <div className="text-3xl font-black text-yellow-300">{lastLevelUp}</div>
+                </div>
+              </div>
+
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/5 flex items-center gap-3 text-left">
+                <span className="text-3xl">🦊</span>
+                <div>
+                  <div className="text-xs font-bold text-slate-400">Trạng thái Thú Cưng</div>
+                  <div className="text-sm font-bold text-slate-200">
+                    {lastLevelUp >= 6 ? 'Thú cưng đã tiến hóa thành Chiến Binh Dũng Mãnh! ⚔️' : lastLevelUp >= 3 ? 'Thú cưng đã tiến hóa thành Thỏ Thiếu Niên Dễ Thương! 🐰' : 'Ấu trùng Trứng Thú Cưng đang lớn dần! 🥚'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowLevelUpModal(false)}
+                className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-900 font-black py-3 rounded-2xl transition-all shadow-lg active:scale-95 animate-pulse"
+              >
+                Tuyệt vời, Tiếp tục thôi! 🚀
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ANIME POMODORO FULLSCREEN MODE */}
       {isAnimePomodoroMode && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm overflow-hidden">
@@ -672,46 +1272,81 @@ export default function App() {
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* HEADER */}
-        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/70 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-white/50">
+        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/90 backdrop-blur-sm p-5 rounded-3xl shadow-sm border border-slate-200">
           <div>
-            <h1 className="text-3xl lg:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center gap-3">
-              <Award className="w-10 h-10 text-indigo-600" />
-              Exam Master
-            </h1>
-            <p className="text-slate-500 mt-2 font-medium flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              Kỷ luật là cầu nối giữa mục tiêu và thành tựu.
-            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 shadow-sm">
+                <Award className="w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900">Exam Master</h1>
+                <p className="text-sm text-slate-500 mt-1">Kỷ luật là cầu nối giữa mục tiêu và thành tựu.</p>
+              </div>
+            </div>
           </div>
           
           <div className="flex flex-col gap-3 w-full lg:w-auto">
-            <div className="flex gap-3 flex-col sm:flex-row">
-              {/* Button Quiz */}
-              <a 
-                href="/quiz.html"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-600 hover:shadow-lg text-white rounded-lg transition-all font-semibold text-sm"
-                title="Làm bài trắc nghiệm"
+            <div className="flex flex-wrap gap-3">
+              {/* Button Quiz Cộng Đồng */}
+              <button 
+                onClick={() => setShowCommunityQuiz(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl transition font-semibold text-sm shadow-md"
+                title="Kho Trắc Nghiệm Cộng Đồng"
               >
                 <BrainCircuit className="w-4 h-4" />
-                📝 Trắc nghiệm
+                Kho Đề
+              </button>
+
+              {/* Shortcut Thời Khóa Biểu */}
+              <button 
+                onClick={() => setShowTimetable(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl transition font-semibold text-sm"
+                title="Xem thời khóa biểu"
+              >
+                <Calendar className="w-4 h-4" />
+                TKB
+              </button>
+
+              {/* Shortcut Học Hóa Sinh */}
+              <a 
+                href="/hoacsinh-game.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl transition font-semibold text-sm shadow-md"
+                title="Game học Hóa Sinh"
+              >
+                <Stethoscope className="w-4 h-4" />
+                Hóa Sinh
               </a>
+
+              {/* Shortcut Góc Flashcard */}
+              <button 
+                onClick={() => setShowFlashcards(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-2xl transition font-semibold text-sm shadow-md"
+                title="Góc Ghi Chú / Flashcard"
+              >
+                <BookOpen className="w-4 h-4" />
+                Flashcard
+              </button>
 
               {/* Button Chat */}
               {isNicknameSet && (
                 <button 
-                  onClick={() => setShowChat(!showChat)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-600 hover:shadow-lg text-white rounded-lg transition-all font-semibold text-sm"
+                  onClick={() => { setShowChat(!showChat); if (!showChat) setUnreadCount(0); }}
+                  className="relative inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition font-semibold text-sm"
                   title="Mở chat"
                 >
                   <MessageCircle className="w-4 h-4" />
                   💬 Chat
-                  {usersOnline.length > 0 && (
+                  {unreadCount > 0 ? (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-bounce">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  ) : usersOnline.length > 0 ? (
                     <span className="ml-1 bg-white/30 px-2 py-0.5 rounded-full text-xs font-bold">
                       {usersOnline.length}
                     </span>
-                  )}
+                  ) : null}
                 </button>
               )}
             </div>
@@ -749,13 +1384,15 @@ export default function App() {
             </details>
 
             {/* Thông báo dữ liệu được lưu */}
-            <div className="text-xs text-emerald-600 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-200">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+            <div className="text-xs text-emerald-600 flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-2xl border border-emerald-200">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               Dữ liệu được lưu tự động
             </div>
           </div>
-          
-          <div className="mt-6 lg:mt-0 flex items-stretch gap-4 max-w-full overflow-x-auto pb-2 pt-2 scrollbar-thin scrollbar-thumb-indigo-200">
+        </header>
+
+        <div className="mt-4 overflow-x-auto">
+          <div className="flex gap-4 min-w-[420px] pb-2 pt-2 scrollbar-thin scrollbar-thumb-indigo-200">
             {exams.map(exam => {
               const tl = timeLefts[exam.id] || { days: 0, hours: 0, minutes: 0 };
               return (
@@ -806,7 +1443,85 @@ export default function App() {
               <span className="text-xs font-bold uppercase tracking-wider">Thêm</span>
             </button>
           </div>
-        </header>
+        </div>
+
+        {/* THỬ THÁCH ĐỒNG ĐỘI GROUP STUDY CHALLENGE */}
+        {currentRoom && (
+          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-purple-950 text-white rounded-3xl p-6 shadow-xl border border-indigo-500/20 relative overflow-hidden group">
+            {/* Decorative shining background */}
+            <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
+            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+            
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              
+              {/* Left Column: Challenge Info */}
+              <div className="lg:col-span-5 space-y-3">
+                <div className="inline-flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border border-indigo-400/20 animate-pulse">
+                  <span>⚔️ Thử thách đồng đội</span>
+                  <span className="bg-indigo-500 text-white px-1.5 py-0.5 rounded-md text-[9px]">Phòng: {currentRoom}</span>
+                </div>
+                <h3 className="text-xl lg:text-2xl font-black text-white">Chung sức tích lũy 10 giờ học Pomodoro!</h3>
+                <p className="text-xs text-indigo-200/80 font-medium">Mỗi giây bạn tập trung học Pomodoro trong phòng sẽ đóng góp trực tiếp vào mục tiêu chung của cả phòng học thời gian thực.</p>
+              </div>
+
+              {/* Middle Column: Progress bar */}
+              <div className="lg:col-span-4 space-y-2">
+                <div className="flex justify-between items-baseline text-xs font-bold">
+                  <span className="text-indigo-300">Đã tích lũy:</span>
+                  <span className="text-lg font-black text-amber-400">
+                    {Math.round(groupChallenge.secondsEarned / 60)} phút / 600 phút
+                  </span>
+                </div>
+                
+                {/* 3D Gradient Progress Bar */}
+                <div className="h-5 w-full bg-slate-950/80 rounded-full overflow-hidden p-0.5 border border-indigo-500/30 shadow-inner relative">
+                  <div 
+                    style={{ width: `${Math.min(100, Math.round((groupChallenge.secondsEarned / 36000) * 100))}%` }} 
+                    className="h-full bg-gradient-to-r from-amber-400 via-pink-500 to-purple-600 rounded-full transition-all duration-1000 ease-out relative"
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-[pulse_1.5s_infinite]"></div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+                  <span>0%</span>
+                  <span className="text-amber-400 animate-pulse font-black">
+                    {Math.min(100, Math.round((groupChallenge.secondsEarned / 36000) * 100))}% Hoàn thành
+                  </span>
+                  <span>100%</span>
+                </div>
+              </div>
+
+              {/* Right Column: Contributors */}
+              <div className="lg:col-span-3 bg-white/5 border border-white/5 rounded-2xl p-3.5 space-y-2.5">
+                <div className="text-[10px] font-black text-indigo-300 uppercase tracking-widest flex items-center gap-1">
+                  <span>🏆</span> Bảng vàng đóng góp
+                </div>
+                
+                <div className="space-y-1.5 max-h-[85px] overflow-y-auto scrollbar-thin">
+                  {Object.entries(groupChallenge.contributors || {}).length === 0 ? (
+                    <div className="text-[10px] text-slate-400 italic text-center py-2">Chưa có ai đóng góp. Hãy bắt đầu học Pomodoro!</div>
+                  ) : (
+                    Object.entries(groupChallenge.contributors || {})
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 3)
+                      .map(([name, seconds], idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs font-bold py-0.5 border-b border-white/5 last:border-0">
+                          <div className="flex items-center gap-1.5 truncate max-w-[120px]">
+                            <span className="text-[10px] text-amber-400">
+                              {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                            </span>
+                            <span className="text-slate-200 truncate">{name}</span>
+                          </div>
+                          <span className="text-[10px] text-indigo-300 font-black">{Math.round(seconds / 60)}p</span>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
@@ -911,6 +1626,22 @@ export default function App() {
                       </button>
                     </div>
 
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">🦊 Thú cưng / Nhân vật đồng hành</label>
+                      <select 
+                        value={pomodoroMascot}
+                        onChange={(e) => setPomodoroMascot(e.target.value)}
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm text-slate-700 font-bold mb-2 cursor-pointer"
+                      >
+                        <option value="auto">Tự động (Học: Sách / Nghỉ: Bé Gái)</option>
+                        <option value="rotate">Luân phiên (Tự động đổi mỗi 15s)</option>
+                        <option value="book">Sách Ma Thuật</option>
+                        <option value="girl">Bé Gái Thư Giãn</option>
+                        <option value="demon">Demon Slayer (Gươm Diệt Quỷ)</option>
+                        <option value="lofi">Lofi Anime Girl</option>
+                      </select>
+                    </div>
+
                     <button 
                       onClick={applyCustomTimes}
                       className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold py-2.5 rounded-lg transition-colors mt-2"
@@ -921,6 +1652,19 @@ export default function App() {
                 ) : (
                   <>
                     <div className="flex flex-col items-center justify-center py-4">
+                      <img 
+                        src={
+                          pomodoroMascot === 'auto' 
+                            ? (pomodoroMode === 'work' ? bookReadGif : girlEatGif)
+                            : pomodoroMascot === 'rotate' ? ALL_GIFS[currentGifIndex]
+                            : pomodoroMascot === 'book' ? bookReadGif
+                            : pomodoroMascot === 'girl' ? girlEatGif
+                            : pomodoroMascot === 'demon' ? demonSlayerGif
+                            : giphyGif
+                        } 
+                        alt="Pomodoro mascot" 
+                        className="w-40 h-40 object-cover rounded-3xl mb-4 shadow-sm border-2 border-white"
+                      />
                       <div className={`text-6xl font-black tabular-nums tracking-tighter mb-6 ${pomodoroMode === 'work' ? 'text-indigo-600' : 'text-emerald-600'}`}>
                         {formatTime(pomodoroTime)}
                       </div>
@@ -1021,9 +1765,308 @@ export default function App() {
                   <div className="text-2xl font-bold text-emerald-600">{formatTotalStudyTime(totalStudySeconds)}</div>
                   <div className="text-xs font-medium text-emerald-800 uppercase mt-1">Thời gian học thực tế</div>
                 </div>
-                <div className="p-3 bg-emerald-100/50 rounded-xl">
-                  <Clock className="w-6 h-6 text-emerald-500" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={fetchStudyLeaderboard}
+                    className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-2 rounded-xl transition-all shadow-md text-xs shrink-0 active:scale-95"
+                    title="Bảng xếp hạng học tập"
+                  >
+                    🏆 BXH
+                  </button>
+                  <div className="p-2.5 bg-emerald-100/50 rounded-xl shrink-0">
+                    <Clock className="w-5 h-5 text-emerald-500" />
+                  </div>
                 </div>
+              </div>
+            </div>
+
+            {/* WIDGET THÚ CƯNG & CẤP ĐỘ HỌC TẬP GAMIFICATION */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 space-y-6 relative overflow-hidden group">
+              {/* Decorative gradient blur */}
+              <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-full blur-2xl -mr-6 -mt-6 transition-all duration-500 group-hover:bg-purple-100"></div>
+              
+              <div className="relative z-10 space-y-5">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <span className="text-2xl">🦊</span>
+                  Thú Cưng & Cấp Độ
+                </h2>
+
+                {/* Level and XP Section */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100/80 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white flex items-center justify-center font-black text-sm shadow-md animate-pulse">
+                        Lv{userLevel}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Học viên</div>
+                        <div className="text-sm font-black text-slate-700 truncate max-w-[120px]">{userNickname || 'Khách'}</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-black uppercase bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100">
+                      {userXP} / {userLevel * 100} XP
+                    </span>
+                  </div>
+
+                  {/* XP Bar */}
+                  <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner relative">
+                    <div 
+                      style={{ width: `${Math.min(100, Math.round((userXP / (userLevel * 100)) * 100))}%` }} 
+                      className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-500 ease-out"
+                    >
+                      <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pet Interactivity Box */}
+                <div className="bg-gradient-to-br from-indigo-50/50 to-purple-50/50 p-4 rounded-2xl border border-indigo-100/50 flex items-center gap-4">
+                  <div className="text-5xl animate-[bounce_2s_infinite] shrink-0 select-none">
+                    {petInfo.mascot}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-black text-indigo-700 uppercase tracking-widest">{petInfo.stage}</div>
+                    <div className="text-[10px] text-slate-500 font-semibold mt-0.5">{petInfo.status}</div>
+                    <div className="inline-flex items-center gap-1 bg-white/80 border border-indigo-100/50 px-2 py-0.5 rounded-lg mt-2 text-[10px] font-bold text-slate-600">
+                      <span>{petInfo.actionEmoji}</span>
+                      <span>Hoạt động</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Badges Box */}
+                <div className="space-y-2">
+                  <div className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🏆</span> Huy hiệu danh giá
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {BADGES_LIST.map((badge, idx) => {
+                      const hasBadge = userBadges.includes(badge.name);
+                      return (
+                        <div 
+                          key={idx}
+                          className={`relative group/badge p-2.5 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${
+                            hasBadge 
+                              ? 'bg-amber-50/40 border-amber-200 shadow-sm' 
+                              : 'bg-slate-50/60 border-slate-100 opacity-40 grayscale'
+                          }`}
+                          title={`${badge.name}: ${badge.desc}`}
+                        >
+                          <span className="text-2xl mb-1">{badge.emoji}</span>
+                          <span className="text-[9px] font-extrabold leading-tight text-slate-600 line-clamp-1">{badge.name}</span>
+                          
+                          {/* Rich Tooltip on Hover */}
+                          <div className="absolute bottom-full mb-2 hidden group-hover/badge:block w-40 bg-slate-800 text-white rounded-lg p-2 text-[9px] font-bold z-50 shadow-xl border border-slate-700 leading-normal pointer-events-none">
+                            <div className="text-amber-400 font-black">{badge.name}</div>
+                            <div className="text-slate-300 mt-0.5">{badge.desc}</div>
+                            <div className="text-[8px] mt-1 text-slate-400 italic">
+                              {hasBadge ? '✓ Đã mở khóa' : '○ Chưa hoàn thành'}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* WIDGET GHI CHÚ NHANH & TÂM TRẠNG HỌC TẬP */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 space-y-5">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <span>📒</span>
+                Góc Tập Trung & Ghi Chú Nháp
+              </h2>
+
+              {/* Mood Tracker */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tâm trạng hiện tại</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${currentMoodObj.color}`}>
+                    {currentMoodObj.label}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between gap-1.5 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                  {MOODS.map(m => (
+                    <button
+                      key={m.emoji}
+                      type="button"
+                      onClick={() => setStudyMood(m.emoji)}
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all duration-300 ${
+                        studyMood === m.emoji 
+                          ? 'bg-white shadow-md border-2 border-indigo-400 scale-110 active:scale-95' 
+                          : 'hover:bg-slate-100 hover:scale-105 active:scale-95 opacity-70'
+                      }`}
+                      title={m.label}
+                    >
+                      {m.emoji}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="p-3 bg-indigo-50/40 rounded-2xl border border-indigo-100/50 text-[11px] font-medium text-indigo-900 italic leading-relaxed">
+                  {currentMoodObj.quote}
+                </div>
+              </div>
+
+              {/* Smart Scratchpad */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ghi chú nháp thông minh</label>
+                  <div className="flex gap-1.5 items-center">
+                    {/* Color chooser */}
+                    {[
+                      { id: 'yellow', class: 'bg-amber-100 border-amber-300' },
+                      { id: 'rose', class: 'bg-rose-100 border-rose-300' },
+                      { id: 'emerald', class: 'bg-emerald-100 border-emerald-300' },
+                      { id: 'sky', class: 'bg-sky-100 border-sky-300' }
+                    ].map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setScratchpadColor(c.id)}
+                        className={`w-3.5 h-3.5 rounded-full border transition-all ${c.class} ${
+                          scratchpadColor === c.id ? 'ring-2 ring-indigo-500 scale-125' : 'hover:scale-110'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="relative group/note">
+                  <textarea
+                    value={scratchpadText}
+                    onChange={(e) => setScratchpadText(e.target.value)}
+                    placeholder="Ghi nhanh công thức, từ vựng hoặc ý tưởng vào đây... Dữ liệu tự động lưu!"
+                    rows={4}
+                    className={`w-full p-4 rounded-2xl border text-sm font-medium focus:ring-2 focus:ring-indigo-400 focus:bg-white outline-none transition-all resize-none shadow-inner ${
+                      scratchpadColor === 'yellow' ? 'bg-amber-50/50 text-amber-900 border-amber-200' :
+                      scratchpadColor === 'rose' ? 'bg-rose-50/50 text-rose-900 border-rose-200' :
+                      scratchpadColor === 'emerald' ? 'bg-emerald-50/50 text-emerald-900 border-emerald-200' :
+                      'bg-sky-50/50 text-sky-900 border-sky-200'
+                    }`}
+                  />
+                  
+                  {/* Floating Action Buttons inside textarea wrapper */}
+                  <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 opacity-0 group-hover/note:opacity-100 transition-opacity duration-300">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(scratchpadText);
+                        alert('✓ Đã copy ghi chú vào bộ nhớ tạm!');
+                      }}
+                      disabled={!scratchpadText}
+                      className="px-2.5 py-1.5 bg-white/95 hover:bg-indigo-500 hover:text-white rounded-lg text-[10px] font-bold text-slate-600 border border-slate-200 shadow-sm transition-colors active:scale-95 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-600"
+                      title="Sao chép toàn bộ ghi chú"
+                    >
+                      📋 Copy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Bạn có chắc muốn xoá nháp này?')) setScratchpadText('');
+                      }}
+                      disabled={!scratchpadText}
+                      className="px-2.5 py-1.5 bg-white/95 hover:bg-red-500 hover:text-white rounded-lg text-[10px] font-bold text-slate-600 border border-slate-200 shadow-sm transition-colors active:scale-95 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-600"
+                      title="Xóa nháp"
+                    >
+                      🗑️ Xóa
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* WIDGET BẢNG TIN HÀNG NGÀY */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col h-[480px] space-y-4">
+              <div className="flex items-center justify-between shrink-0 pb-3 border-b border-slate-100">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  📡 Bảng Tin Học Tập
+                </h2>
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-95 border border-emerald-200">Trực Tiếp</span>
+              </div>
+
+              {/* Bộ lọc loại thông báo */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1 shrink-0 scrollbar-none">
+                {[
+                  { id: 'all', label: 'Tất cả' },
+                  { id: 'task', label: 'Nhiệm vụ' },
+                  { id: 'quiz', label: 'Tạo đề' },
+                  { id: 'join', label: 'Thành viên' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActivityFilter(tab.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                      activityFilter === tab.id
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Danh sách tin tức */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                {filteredActivities.length === 0 ? (
+                  <div className="h-full flex flex-col justify-center items-center text-slate-400 text-sm py-10">
+                    <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center border border-dashed mb-3 text-lg">
+                      📡
+                    </div>
+                    <span className="font-semibold text-xs text-slate-400">Chưa có hoạt động nào</span>
+                  </div>
+                ) : (
+                  filteredActivities.map(act => {
+                    let actionText = '';
+                    let iconBg = 'bg-slate-100 text-slate-700';
+                    let detailText = act.details;
+
+                    if (act.type === 'join') {
+                      actionText = 'vừa gia nhập biệt đội học tập!';
+                      iconBg = 'bg-blue-50 text-blue-600 border border-blue-100';
+                    } else if (act.type === 'task_complete') {
+                      actionText = 'đã xuất sắc hoàn thành nhiệm vụ:';
+                      iconBg = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+                    } else if (act.type === 'quiz_create') {
+                      actionText = 'vừa tạo một bộ đề trắc nghiệm mới:';
+                      iconBg = 'bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-100';
+                    } else if (act.type === 'flashcard_create') {
+                      actionText = 'vừa tạo một bộ Flashcard mới:';
+                      iconBg = 'bg-pink-50 text-pink-600 border border-pink-100';
+                    }
+
+                    return (
+                      <div key={act.id} className="flex gap-3 p-3 bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-2xl transition-all group hover:scale-[1.01]">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 font-bold ${iconBg}`}>
+                          {act.emoji || '🐾'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="font-bold text-slate-800 text-xs truncate flex items-center gap-1">
+                              {act.nickname}
+                              {act.nickname === userNickname && (
+                                <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold">Bạn</span>
+                              )}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-semibold shrink-0">
+                              {getRelativeTime(act.timestamp)}
+                            </span>
+                          </div>
+                          <p className="text-slate-500 text-xs mt-0.5 font-medium leading-relaxed">
+                            {actionText} {detailText && <span className="font-bold text-slate-700 block mt-0.5 truncate">{detailText}</span>}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -1291,13 +2334,13 @@ export default function App() {
           </div>
         </div>
 
-        {/* MODAL CHATBOX */}
+        {/* MODAL NHẬP NICKNAME & PHÒNG */}
         {!isNicknameSet && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md animate-in zoom-in-95 duration-300">
               <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <MessageCircle className="w-6 h-6 text-indigo-600" />
-                Đặt Nickname để Chat
+                Tham gia Chat
               </h3>
               <div className="space-y-4">
                 <div>
@@ -1320,124 +2363,345 @@ export default function App() {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">🚪 Mã phòng học (tuỳ chọn)</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="text" 
+                        id="chatRoom"
+                        defaultValue={currentRoom === 'global' ? '' : currentRoom}
+                        placeholder="Để trống = phòng chung"
+                        className="w-full pl-9 pr-3 py-3 bg-slate-50 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none font-medium text-slate-700 uppercase"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1.5">Ví dụ: NHOM-A, TOAN12, ON-THI-DH...</p>
+                </div>
                 <button 
                   onClick={() => {
                     const nickname = document.getElementById('chatNickname').value;
                     const animal = document.getElementById('chatAnimal').value;
+                    const roomRaw = (document.getElementById('chatRoom').value || '').trim();
+                    const roomId = roomRaw === '' ? 'global' : roomRaw;
+                    localStorage.setItem('exam_master_room', roomId);
+                    setCurrentRoom(roomId);
                     handleSetNickname(nickname, animal);
                   }}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all"
+                  className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
                 >
-                  ✓ Bắt đầu Chat
+                  <DoorOpen className="w-5 h-5" />
+                  Vào phòng học!
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* MODAL CHATBOX */}
+        {/* WIDGET CHATBOX */}
         {isNicknameSet && showChat && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-96 flex flex-col animate-in zoom-in-95 duration-300">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-4 flex justify-between items-center rounded-t-2xl">
-                <div className="flex items-center gap-3">
-                  <MessageCircle className="w-6 h-6" />
-                  <div>
-                    <h3 className="font-bold text-lg">💬 Chat Online</h3>
-                    <div className="flex items-center gap-2 text-sm opacity-90">
-                      <span>{usersOnline.length} người đang online</span>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${socketConnected ? 'bg-emerald-500/20 text-emerald-100' : 'bg-amber-500/20 text-amber-100'}`}>
-                        <span className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-emerald-300' : 'bg-amber-300'}`}></span>
-                        {socketConnected ? 'Đã kết nối' : 'Đang kết nối'}
-                      </span>
-                    </div>
+          <div className="fixed bottom-4 right-4 z-50 flex flex-col bg-white rounded-2xl shadow-2xl w-[360px] max-h-[550px] h-[calc(100vh-32px)] border border-slate-200 animate-in slide-in-from-bottom-8 duration-300">
+            {/* Header */}
+            <div className="bg-blue-600 text-white p-3 flex justify-between items-center rounded-t-2xl shadow-md z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold text-lg">
+                  💬
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm leading-tight flex items-center gap-1">
+                    Phòng: {currentRoom}
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-[11px] opacity-90 mt-0.5">
+                    <span className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`}></span>
+                    {socketConnected ? `${usersOnline.length} người đang online` : 'Đang kết nối...'}
                   </div>
                 </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { setShowChangeRoom(true); fetchActiveRooms(); }}
+                  className="text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"
+                  title="Đổi phòng học"
+                >
+                  <DoorOpen className="w-5 h-5" />
+                </button>
                 <button 
                   onClick={() => setShowChat(false)}
-                  className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
+                  className="text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Users Online Panel - Horizontal Scroll */}
+            {usersOnline.length > 0 && (
+              <>
+                {/* Cài đặt trạng thái cá nhân */}
+                <div className="bg-white border-b border-slate-100 p-2 flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Trạng thái:</span>
+                  <input 
+                    type="text" 
+                    value={userStatus}
+                    onChange={(e) => setUserStatus(e.target.value)}
+                    placeholder="VD: Đang cày cuốc, Nghỉ ngơi..."
+                    className="flex-1 text-xs px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400"
+                  />
+                </div>
+
+                <div className="bg-slate-50 border-b border-slate-100 p-3 flex gap-4 overflow-x-auto scrollbar-hide shrink-0 shadow-inner">
+                  {usersOnline.map(user => (
+                    <div key={user.id} className="flex flex-col items-center gap-1 min-w-[64px]" title={`${user.nickname} - Hoàn thành ${user.progress}%`}>
+                      <div className="relative">
+                        <div className={`w-12 h-12 bg-white rounded-full border-2 p-0.5 flex items-center justify-center text-2xl shadow-sm transition-all ${user.isFocusing ? 'border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse' : 'border-blue-400'}`}>
+                          {user.emoji}
+                        </div>
+                        <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></div>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-600 truncate w-full text-center">{user.nickname}</span>
+                      <span className="text-[9px] text-slate-400 truncate w-full text-center">{user.statusText || 'Online'}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Messages Panel */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#e5ecef]">
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-60">
+                  <MessageCircle className="w-12 h-12 mb-2" />
+                  <p className="text-sm">Bắt đầu trò chuyện</p>
+                </div>
+              ) : (
+                messages.map((msg, idx) => {
+                  const isMe = msg.userId === socketId;
+                  return (
+                    <div key={msg.id || idx} className={`flex gap-2 w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      {/* Avatar for others */}
+                      {!isMe && (
+                        <div className="w-8 h-8 rounded-full bg-white flex flex-shrink-0 items-center justify-center shadow-sm text-sm border border-slate-200 mt-auto">
+                          {msg.emoji || ANIMAL_EMOJIS[msg.animalName] || '💬'}
+                        </div>
+                      )}
+                      
+                      <div className={`max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                        {!isMe && (
+                          <span className="text-[11px] text-slate-500 font-medium mb-1 ml-1">{msg.nickname}</span>
+                        )}
+                        <div className={`px-3.5 py-2 shadow-sm text-[14px] leading-relaxed break-words ${
+                          isMe 
+                            ? 'bg-blue-500 text-white rounded-2xl rounded-br-sm' 
+                            : 'bg-white text-slate-800 rounded-2xl rounded-bl-sm border border-slate-100'
+                        }`}>
+                          {msg.message || msg.text}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Input */}
+            <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-slate-200 flex gap-2 shrink-0">
+              <input 
+                type="text" 
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Nhập tin nhắn..."
+                className="flex-1 px-4 py-2.5 bg-slate-100 text-[14px] rounded-full focus:ring-0 focus:bg-slate-200 outline-none transition-colors text-slate-700"
+              />
+              <button 
+                type="submit" 
+                disabled={!newMessage.trim()}
+                className={`w-10 h-10 rounded-full flex flex-shrink-0 items-center justify-center transition-colors ${newMessage.trim() ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' : 'bg-slate-100 text-slate-400'}`}
+              >
+                <Send className="w-4 h-4 ml-0.5" />
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* MODAL ĐỔI PHÒNG */}
+        {showChangeRoom && (
+          <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <DoorOpen className="w-5 h-5 text-indigo-600" />
+                  Đổi phòng học
+                </h3>
+                <button onClick={() => setShowChangeRoom(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="flex-1 flex overflow-hidden">
-                {/* Users Online Panel */}
-                {usersOnline.length > 0 && (
-                  <div className="w-48 border-r border-slate-200 p-4 overflow-y-auto bg-slate-50">
-                    <p className="text-xs font-bold text-slate-600 mb-3 uppercase">👥 Online</p>
-                    <div className="space-y-2">
-                      {usersOnline.map(user => (
-                        <div key={user.id} className="p-2.5 bg-white rounded-lg border border-slate-200 hover:border-indigo-300 transition-colors">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-lg">{user.emoji}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-slate-700 truncate">{user.nickname}</p>
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-slate-600 mb-2">Nhập mã phòng mới</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      autoFocus
+                      type="text"
+                      value={roomInputModal}
+                      onChange={(e) => setRoomInputModal(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === 'Enter' && handleChangeRoom(roomInputModal)}
+                      placeholder="Mã phòng (VD: NHOM-A)"
+                      className="w-full pl-9 pr-3 py-3 bg-slate-50 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 uppercase tracking-wider"
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleChangeRoom(roomInputModal)}
+                    className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors shadow-sm"
+                  >
+                    Vào
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-1.5">Để trống và nhấn "Vào" để về phòng chung (global)</p>
+              </div>
+
+              {/* Phòng đang hoạt động */}
+              {activeRooms.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">📡 Phòng đang có người:</p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {activeRooms.map(room => (
+                      <button
+                        key={room.roomId}
+                        onClick={() => handleChangeRoom(room.roomId)}
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left ${
+                          room.roomId === currentRoom
+                            ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                            : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Hash className="w-4 h-4 opacity-60" />
+                          <span className="font-bold text-sm">{room.roomId}</span>
+                          {room.roomId === currentRoom && <span className="text-xs bg-indigo-200 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold">Đang ở đây</span>}
+                        </div>
+                        <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-1 rounded-full">
+                          👥 {room.userCount}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {/* IN-APP TOAST NOTIFICATION */}
+        {toastNotification && (
+          <div className="fixed bottom-24 right-4 z-[60] bg-white/95 backdrop-blur-sm border-l-4 border-blue-500 shadow-xl rounded-xl p-3 w-[300px] animate-in slide-in-from-right-8 duration-300">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0 text-xl shadow-inner border border-slate-200">
+                {toastNotification.emoji}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{toastNotification.sender} vừa nhắn</p>
+                <p className="text-sm font-semibold text-slate-800 line-clamp-2 mt-0.5 leading-snug">{toastNotification.text}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== STUDY LEADERBOARD MODAL ==================== */}
+        {showStudyLeaderboard && (
+          <div className="fixed inset-0 bg-black/60 z-[80] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-lg animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+              
+              <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="bg-amber-100 p-2.5 rounded-2xl text-amber-600">
+                    <Award className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800">Bảng Xếp Hạng Học Tập</h3>
+                    <p className="text-xs text-slate-500 font-semibold">Tích lũy thời gian học thực tế của các chiến thần</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowStudyLeaderboard(false)}
+                  className="p-2 hover:bg-slate-100 rounded-xl transition text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-1">
+                {loadingStudyLeaderboard ? (
+                  <div className="flex flex-col justify-center items-center py-20 gap-3">
+                    <div className="animate-spin w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full"></div>
+                    <span className="text-sm font-semibold text-slate-500">Đang tải bảng xếp hạng...</span>
+                  </div>
+                ) : studyLeaderboardScores.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-dashed border-slate-200">
+                      <Award className="w-8 h-8 text-slate-300" />
+                    </div>
+                    <h4 className="font-bold text-slate-700">Chưa có dữ liệu học tập</h4>
+                    <p className="text-xs text-slate-400 mt-1">Hãy bật Pomodoro và tích lũy những giây đầu tiên nhé!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 pb-4">
+                    {studyLeaderboardScores.map((entry, idx) => {
+                      const bgMedal = idx === 0 ? 'bg-yellow-100 text-yellow-700 font-bold' : idx === 1 ? 'bg-slate-100 text-slate-700 font-bold' : idx === 2 ? 'bg-amber-100 text-amber-800 font-bold' : 'bg-slate-50 text-slate-500 font-semibold';
+                      
+                      return (
+                        <div 
+                          key={entry.id}
+                          className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                            entry.nickname === userNickname 
+                              ? 'bg-indigo-50 border-indigo-200 shadow-sm' 
+                              : 'bg-white border-slate-100 hover:border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`w-8 h-8 rounded-xl font-bold flex items-center justify-center text-sm ${bgMedal}`}>
+                              {idx + 1}
+                            </span>
+                            
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800 text-sm flex items-center gap-1.5 font-sans">
+                                {entry.nickname}
+                                {entry.nickname === userNickname && (
+                                  <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold">Bạn</span>
+                                )}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-semibold">
+                                Cập nhật: {entry.updatedAt ? new Date(entry.updatedAt.seconds ? entry.updatedAt.seconds * 1000 : entry.updatedAt).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Vừa xong'}
+                              </span>
                             </div>
                           </div>
-                          <div className="mt-1.5 flex items-center gap-1">
-                            <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                              <div 
-                                style={{ width: `${user.progress}%` }} 
-                                className="h-full bg-indigo-500 transition-all"
-                              ></div>
+
+                          <div className="text-right">
+                            <span className="text-base font-black text-indigo-600">
+                              {formatTotalStudyTime(entry.totalSeconds)}
+                            </span>
+                            <div className="text-[11px] font-bold text-slate-400 mt-0.5">
+                              {entry.totalSeconds.toLocaleString()} giây
                             </div>
-                            <span className="text-xs font-bold text-indigo-600 w-8 text-right">{user.progress}%</span>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
                 )}
-
-                {/* Messages Panel */}
-                <div className="flex-1 flex flex-col">
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
-                    {messages.length === 0 ? (
-                      <p className="text-center text-slate-400 py-8">Chưa có tin nhắn nào</p>
-                    ) : (
-                      messages.map((msg, idx) => (
-                        <div 
-                          key={msg.id || idx} 
-                          className={`flex gap-2.5 ${msg.userId === socketId ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div className={`max-w-xs ${msg.userId === socketId ? 'order-2' : 'order-1'}`}>
-                            <div className={`text-xs font-semibold mb-1 ${msg.userId === socketId ? 'text-right text-indigo-600' : 'text-slate-700'}`}>
-                              {(msg.emoji || ANIMAL_EMOJIS[msg.animalName] || '💬')} {msg.nickname} • {typeof msg.progress === 'number' ? msg.progress : 0}%
-                            </div>
-                            <div className={`px-3.5 py-2.5 rounded-2xl text-sm ${
-                              msg.userId === socketId 
-                                ? 'bg-indigo-500 text-white rounded-br-none' 
-                                : 'bg-slate-100 text-slate-900 rounded-bl-none'
-                            }`}>
-                              {msg.message || msg.text}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Input */}
-                  <form onSubmit={handleSendMessage} className="border-t border-slate-200 p-4 bg-slate-50 flex gap-2">
-                    <input 
-                      type="text" 
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Nhắn tin..."
-                      className="flex-1 px-4 py-3 bg-white border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none font-medium"
-                    />
-                    <button 
-                      type="submit" 
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg transition-colors font-bold flex items-center gap-2"
-                    >
-                      <Send className="w-4 h-4" />
-                      Gửi
-                    </button>
-                  </form>
-                </div>
               </div>
+
+              <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end shrink-0">
+                <button
+                  onClick={() => setShowStudyLeaderboard(false)}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-sm transition-colors"
+                >
+                  Đóng
+                </button>
+              </div>
+
             </div>
           </div>
         )}
