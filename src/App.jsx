@@ -34,6 +34,7 @@ import prepareLetsGoGif from './Prepare Lets Go GIF by Xbox.gif';
 import scrollingLateNightGif from './Scrolling Late Night GIF.gif';
 import tiredCatGif from './Tired Cat GIF.gif';
 import whiteCatGif from './White Cat GIF.gif';
+import cuteMangoLogo from './cute_mango_study_logo.png';
 
 const sendSoundAudio = new Audio('https://actions.google.com/sounds/v1/cartoon/pop.ogg');
 const receiveSoundAudio = new Audio('https://actions.google.com/sounds/v1/alarms/pop_up_notification.ogg');
@@ -316,24 +317,7 @@ export default function App() {
     contributors: {}
   });
 
-  useEffect(() => {
-    if (!currentRoom) return;
-    const docRef = doc(db, 'group_challenges', currentRoom);
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setGroupChallenge(docSnap.data());
-      } else {
-        setDoc(docRef, {
-          secondsEarned: 0,
-          contributors: {},
-          lastUpdated: serverTimestamp()
-        }).catch(err => console.error("Lỗi khởi tạo thử thách nhóm:", err));
-      }
-    }, (error) => {
-      console.error("Lỗi lắng nghe thử thách nhóm:", error);
-    });
-    return () => unsubscribe();
-  }, [currentRoom]);
+
 
   useEffect(() => {
     showChatRef.current = showChat;
@@ -371,6 +355,25 @@ export default function App() {
   const [showChangeRoom, setShowChangeRoom] = useState(false);
   const [roomInputModal, setRoomInputModal] = useState('');
   const [activeRooms, setActiveRooms] = useState([]);
+
+  useEffect(() => {
+    if (!currentRoom) return;
+    const docRef = doc(db, 'group_challenges', currentRoom);
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setGroupChallenge(docSnap.data());
+      } else {
+        setDoc(docRef, {
+          secondsEarned: 0,
+          contributors: {},
+          lastUpdated: serverTimestamp()
+        }).catch(err => console.error("Lỗi khởi tạo thử thách nhóm:", err));
+      }
+    }, (error) => {
+      console.error("Lỗi lắng nghe thử thách nhóm:", error);
+    });
+    return () => unsubscribe();
+  }, [currentRoom]);
 
   const priorities = ['Cao', 'Trung bình', 'Thấp'];
 
@@ -1275,8 +1278,8 @@ export default function App() {
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/90 backdrop-blur-sm p-5 rounded-3xl shadow-sm border border-slate-200">
           <div>
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 shadow-sm">
-                <Award className="w-6 h-6" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 shadow-sm overflow-hidden shrink-0">
+                <img src={cuteMangoLogo} className="w-full h-full object-cover" alt="Cute Mango Logo" />
               </div>
               <div>
                 <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900">Exam Master</h1>
@@ -1445,83 +1448,106 @@ export default function App() {
           </div>
         </div>
 
-        {/* THỬ THÁCH ĐỒNG ĐỘI GROUP STUDY CHALLENGE */}
-        {currentRoom && (
-          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-purple-950 text-white rounded-3xl p-6 shadow-xl border border-indigo-500/20 relative overflow-hidden group">
-            {/* Decorative shining background */}
-            <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
-            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-            
-            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-              
-              {/* Left Column: Challenge Info */}
-              <div className="lg:col-span-5 space-y-3">
-                <div className="inline-flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border border-indigo-400/20 animate-pulse">
-                  <span>⚔️ Thử thách đồng đội</span>
-                  <span className="bg-indigo-500 text-white px-1.5 py-0.5 rounded-md text-[9px]">Phòng: {currentRoom}</span>
-                </div>
-                <h3 className="text-xl lg:text-2xl font-black text-white">Chung sức tích lũy 10 giờ học Pomodoro!</h3>
-                <p className="text-xs text-indigo-200/80 font-medium">Mỗi giây bạn tập trung học Pomodoro trong phòng sẽ đóng góp trực tiếp vào mục tiêu chung của cả phòng học thời gian thực.</p>
+        {/* BẢNG THÔNG BÁO HOẠT ĐỘNG HÀNG NGÀY (DAILY ACTIVITY BULLETIN BOARD) */}
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white rounded-3xl p-6 shadow-xl border border-indigo-500/20 relative overflow-hidden group">
+          <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
+          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+
+          <div className="relative z-10 space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                <h3 className="text-lg lg:text-xl font-black text-white flex items-center gap-2">
+                  📢 Bảng Thông Báo Hoạt Động Hàng Ngày
+                </h3>
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-400/20">Trực Tiếp</span>
               </div>
 
-              {/* Middle Column: Progress bar */}
-              <div className="lg:col-span-4 space-y-2">
-                <div className="flex justify-between items-baseline text-xs font-bold">
-                  <span className="text-indigo-300">Đã tích lũy:</span>
-                  <span className="text-lg font-black text-amber-400">
-                    {Math.round(groupChallenge.secondsEarned / 60)} phút / 600 phút
-                  </span>
-                </div>
-                
-                {/* 3D Gradient Progress Bar */}
-                <div className="h-5 w-full bg-slate-950/80 rounded-full overflow-hidden p-0.5 border border-indigo-500/30 shadow-inner relative">
-                  <div 
-                    style={{ width: `${Math.min(100, Math.round((groupChallenge.secondsEarned / 36000) * 100))}%` }} 
-                    className="h-full bg-gradient-to-r from-amber-400 via-pink-500 to-purple-600 rounded-full transition-all duration-1000 ease-out relative"
+              {/* Filter Tabs in banner */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full scrollbar-none">
+                {[
+                  { id: 'all', label: 'Tất cả' },
+                  { id: 'task', label: 'Nhiệm vụ' },
+                  { id: 'quiz', label: 'Tạo đề' },
+                  { id: 'join', label: 'Thành viên' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActivityFilter(tab.id)}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 border ${
+                      activityFilter === tab.id
+                        ? 'bg-white text-indigo-950 border-white shadow-md'
+                        : 'bg-white/5 hover:bg-white/10 text-indigo-200 border-white/5'
+                    }`}
                   >
-                    <div className="absolute inset-0 bg-white/20 animate-[pulse_1.5s_infinite]"></div>
-                  </div>
-                </div>
-                
-                <div className="flex justify-between text-[10px] text-slate-400 font-bold">
-                  <span>0%</span>
-                  <span className="text-amber-400 animate-pulse font-black">
-                    {Math.min(100, Math.round((groupChallenge.secondsEarned / 36000) * 100))}% Hoàn thành
-                  </span>
-                  <span>100%</span>
-                </div>
-              </div>
-
-              {/* Right Column: Contributors */}
-              <div className="lg:col-span-3 bg-white/5 border border-white/5 rounded-2xl p-3.5 space-y-2.5">
-                <div className="text-[10px] font-black text-indigo-300 uppercase tracking-widest flex items-center gap-1">
-                  <span>🏆</span> Bảng vàng đóng góp
-                </div>
-                
-                <div className="space-y-1.5 max-h-[85px] overflow-y-auto scrollbar-thin">
-                  {Object.entries(groupChallenge.contributors || {}).length === 0 ? (
-                    <div className="text-[10px] text-slate-400 italic text-center py-2">Chưa có ai đóng góp. Hãy bắt đầu học Pomodoro!</div>
-                  ) : (
-                    Object.entries(groupChallenge.contributors || {})
-                      .sort((a, b) => b[1] - a[1])
-                      .slice(0, 3)
-                      .map(([name, seconds], idx) => (
-                        <div key={idx} className="flex justify-between items-center text-xs font-bold py-0.5 border-b border-white/5 last:border-0">
-                          <div className="flex items-center gap-1.5 truncate max-w-[120px]">
-                            <span className="text-[10px] text-amber-400">
-                              {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                            </span>
-                            <span className="text-slate-200 truncate">{name}</span>
-                          </div>
-                          <span className="text-[10px] text-indigo-300 font-black">{Math.round(seconds / 60)}p</span>
-                        </div>
-                      ))
-                  )}
-                </div>
+                    {tab.label}
+                  </button>
+                ))}
               </div>
             </div>
+
+            {/* Displaying 3 most recent filtered activities in a gorgeous grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {filteredActivities.length === 0 ? (
+                <div className="col-span-3 text-center py-6 text-indigo-200/60 font-medium italic text-xs">
+                  📡 Chưa có hoạt động nào trong ngày. Hãy bắt đầu hoạt động để bảng tin sinh động hơn nhé! 🌟
+                </div>
+              ) : (
+                filteredActivities.slice(0, 3).map(act => {
+                  let actionText = '';
+                  let cardBg = 'bg-white/5 border-white/5';
+                  let iconBg = 'bg-white/10 text-slate-200';
+                  let detailText = act.details;
+
+                  if (act.type === 'join') {
+                    actionText = 'vừa gia nhập biệt đội!';
+                    cardBg = 'bg-blue-500/10 border-blue-500/10';
+                    iconBg = 'bg-blue-500/20 text-blue-300 border border-blue-500/20';
+                  } else if (act.type === 'task_complete') {
+                    actionText = 'đã hoàn thành nhiệm vụ:';
+                    cardBg = 'bg-emerald-500/10 border-emerald-500/10';
+                    iconBg = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20';
+                  } else if (act.type === 'quiz_create') {
+                    actionText = 'vừa tạo bộ đề mới:';
+                    cardBg = 'bg-fuchsia-500/10 border-fuchsia-500/10';
+                    iconBg = 'bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/20';
+                  } else if (act.type === 'flashcard_create') {
+                    actionText = 'vừa tạo bộ Flashcard mới:';
+                    cardBg = 'bg-pink-500/10 border-pink-500/10';
+                    iconBg = 'bg-pink-500/20 text-pink-300 border border-pink-500/20';
+                  }
+
+                  return (
+                    <div key={act.id} className={`flex gap-3 p-3.5 border rounded-2xl transition-all hover:bg-white/10 ${cardBg}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 font-bold ${iconBg}`}>
+                        {act.emoji || '🐾'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="font-bold text-white text-xs truncate flex items-center gap-1">
+                            {act.nickname}
+                            {act.nickname === userNickname && (
+                              <span className="text-[8px] bg-white/20 text-white px-1.5 py-0.5 rounded-full font-bold">Bạn</span>
+                            )}
+                          </span>
+                          <span className="text-[9px] text-indigo-300 font-semibold shrink-0">
+                            {getRelativeTime(act.timestamp)}
+                          </span>
+                        </div>
+                        <p className="text-indigo-200/70 text-xs mt-1 font-medium leading-relaxed">
+                          {actionText} {detailText && <span className="font-bold text-white block mt-0.5 truncate" title={detailText}>{detailText}</span>}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
-        )}
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
@@ -1978,97 +2004,81 @@ export default function App() {
               </div>
             </div>
 
-            {/* WIDGET BẢNG TIN HÀNG NGÀY */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col h-[480px] space-y-4">
-              <div className="flex items-center justify-between shrink-0 pb-3 border-b border-slate-100">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                  </span>
-                  📡 Bảng Tin Học Tập
-                </h2>
-                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider scale-95 border border-emerald-200">Trực Tiếp</span>
-              </div>
-
-              {/* Bộ lọc loại thông báo */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 shrink-0 scrollbar-none">
-                {[
-                  { id: 'all', label: 'Tất cả' },
-                  { id: 'task', label: 'Nhiệm vụ' },
-                  { id: 'quiz', label: 'Tạo đề' },
-                  { id: 'join', label: 'Thành viên' }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActivityFilter(tab.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                      activityFilter === tab.id
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-500'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Danh sách tin tức */}
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
-                {filteredActivities.length === 0 ? (
-                  <div className="h-full flex flex-col justify-center items-center text-slate-400 text-sm py-10">
-                    <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center border border-dashed mb-3 text-lg">
-                      📡
+            {/* WIDGET THỬ THÁCH ĐỒNG ĐỘI (SIDEBAR GROUP STUDY CHALLENGE) */}
+            {currentRoom && (
+              <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 text-white rounded-3xl p-6 shadow-xl border border-indigo-500/20 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
+                
+                <div className="relative z-10 space-y-4">
+                  <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                    <div className="inline-flex items-center gap-1.5 bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border border-indigo-400/20">
+                      ⚔️ Thử thách nhóm
                     </div>
-                    <span className="font-semibold text-xs text-slate-400">Chưa có hoạt động nào</span>
+                    <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-md text-[9px] font-bold">Phòng: {currentRoom}</span>
                   </div>
-                ) : (
-                  filteredActivities.map(act => {
-                    let actionText = '';
-                    let iconBg = 'bg-slate-100 text-slate-700';
-                    let detailText = act.details;
 
-                    if (act.type === 'join') {
-                      actionText = 'vừa gia nhập biệt đội học tập!';
-                      iconBg = 'bg-blue-50 text-blue-600 border border-blue-100';
-                    } else if (act.type === 'task_complete') {
-                      actionText = 'đã xuất sắc hoàn thành nhiệm vụ:';
-                      iconBg = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
-                    } else if (act.type === 'quiz_create') {
-                      actionText = 'vừa tạo một bộ đề trắc nghiệm mới:';
-                      iconBg = 'bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-100';
-                    } else if (act.type === 'flashcard_create') {
-                      actionText = 'vừa tạo một bộ Flashcard mới:';
-                      iconBg = 'bg-pink-50 text-pink-600 border border-pink-100';
-                    }
+                  <div className="space-y-1.5">
+                    <h4 className="text-sm font-bold text-white leading-snug">Chung sức tích lũy 10 giờ học Pomodoro!</h4>
+                    <p className="text-[10px] text-indigo-200/80 font-medium leading-relaxed">Mỗi giây bạn tập trung học Pomodoro trong phòng sẽ đóng góp vào mục tiêu chung thời gian thực.</p>
+                  </div>
 
-                    return (
-                      <div key={act.id} className="flex gap-3 p-3 bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-2xl transition-all group hover:scale-[1.01]">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 font-bold ${iconBg}`}>
-                          {act.emoji || '🐾'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="font-bold text-slate-800 text-xs truncate flex items-center gap-1">
-                              {act.nickname}
-                              {act.nickname === userNickname && (
-                                <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold">Bạn</span>
-                              )}
-                            </span>
-                            <span className="text-[9px] text-slate-400 font-semibold shrink-0">
-                              {getRelativeTime(act.timestamp)}
-                            </span>
-                          </div>
-                          <p className="text-slate-500 text-xs mt-0.5 font-medium leading-relaxed">
-                            {actionText} {detailText && <span className="font-bold text-slate-700 block mt-0.5 truncate">{detailText}</span>}
-                          </p>
-                        </div>
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex justify-between items-baseline text-[10px] font-bold">
+                      <span className="text-indigo-300">Đã tích lũy:</span>
+                      <span className="text-xs font-black text-amber-400">
+                        {Math.round(groupChallenge.secondsEarned / 60)} phút / 600 phút
+                      </span>
+                    </div>
+                    
+                    {/* 3D Gradient Progress Bar */}
+                    <div className="h-3.5 w-full bg-slate-950/80 rounded-full overflow-hidden p-0.5 border border-indigo-500/30 shadow-inner relative">
+                      <div 
+                        style={{ width: `${Math.min(100, Math.round((groupChallenge.secondsEarned / 36000) * 100))}%` }} 
+                        className="h-full bg-gradient-to-r from-amber-400 via-pink-500 to-purple-600 rounded-full transition-all duration-1000 ease-out relative"
+                      >
+                        <div className="absolute inset-0 bg-white/20 animate-[pulse_1.5s_infinite]"></div>
                       </div>
-                    );
-                  })
-                )}
+                    </div>
+                    
+                    <div className="flex justify-between text-[9px] text-slate-400 font-bold">
+                      <span>0%</span>
+                      <span className="text-amber-400 animate-pulse font-black">
+                        {Math.min(100, Math.round((groupChallenge.secondsEarned / 36000) * 100))}% Hoàn thành
+                      </span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+
+                  {/* Contributors Box */}
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-3.5 space-y-2 pt-2">
+                    <div className="text-[9px] font-black text-indigo-300 uppercase tracking-widest flex items-center gap-1">
+                      <span>🏆</span> Bảng vàng đóng góp
+                    </div>
+                    
+                    <div className="space-y-1.5 max-h-[85px] overflow-y-auto scrollbar-thin">
+                      {Object.entries(groupChallenge.contributors || {}).length === 0 ? (
+                        <div className="text-[10px] text-slate-400 italic text-center py-2">Chưa có ai đóng góp.</div>
+                      ) : (
+                        Object.entries(groupChallenge.contributors || {})
+                          .sort((a, b) => b[1] - a[1])
+                          .slice(0, 3)
+                          .map(([name, seconds], idx) => (
+                            <div key={idx} className="flex justify-between items-center text-xs font-bold py-0.5 border-b border-white/5 last:border-0">
+                              <div className="flex items-center gap-1.5 truncate max-w-[120px]">
+                                <span className="text-[10px] text-amber-400">
+                                  {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                                </span>
+                                <span className="text-slate-200 truncate">{name}</span>
+                              </div>
+                              <span className="text-[10px] text-indigo-300 font-black">{Math.round(seconds / 60)}p</span>
+                            </div>
+                          ))
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* CỘT PHẢI: Form & Danh sách (8 columns) */}
