@@ -4,7 +4,7 @@ import {
   Clock, Plus, BarChart3, Target, Award, BookMarked,
   Play, Pause, RotateCcw, Coffee, BrainCircuit, Sparkles, 
   Settings, Music, Bell, ListTree, CornerDownRight, Send,
-  Users, MessageCircle, LogOut, Edit2, Check, X, Hash, DoorOpen
+  Users, MessageCircle, LogOut, Edit2, Check, X, Hash, DoorOpen, Palette
 } from 'lucide-react';
 import io from 'socket.io-client';
 import { db } from './firebase';
@@ -16,6 +16,7 @@ import BioChemQuiz from './BioChemQuiz.jsx';
 import Timetable from './Timetable.jsx';
 import CommunityQuiz from './CommunityQuiz.jsx';
 import FlashcardsHub from './FlashcardsHub.jsx';
+import SharedStudyRoom from './SharedStudyRoom.jsx';
 import bookReadGif from './Book Read GIF.gif';
 import girlEatGif from './Girl Eat GIF.gif';
 import demonSlayerGif from './Demonslayer Kimetsunoyaiba GIF by KonnichiwaFestival.gif';
@@ -197,6 +198,8 @@ export default function App() {
   const [showTimetable, setShowTimetable] = useState(false);
   const [showCommunityQuiz, setShowCommunityQuiz] = useState(false);
   const [showFlashcards, setShowFlashcards] = useState(false);
+  const [showSharedStudyRoom, setShowSharedStudyRoom] = useState(false);
+  const [studySession, setStudySession] = useState(null);
   const [isAutoStart, setIsAutoStart] = useState(true);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [videoId, setVideoId] = useState('');
@@ -234,6 +237,17 @@ export default function App() {
   const [selectedOnlineUser, setSelectedOnlineUser] = useState(null);
   const [showChat, setShowChat] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [appTheme, setAppTheme] = useState(() => {
+    return localStorage.getItem('exam_master_theme') || 'default';
+  });
+  const [dndMode, setDndMode] = useState(() => {
+    return localStorage.getItem('exam_master_dnd') === 'true';
+  });
+  const dndModeRef = useRef(dndMode);
+  useEffect(() => {
+    dndModeRef.current = dndMode;
+  }, [dndMode]);
   const [toastNotification, setToastNotification] = useState(null);
   const showChatRef = useRef(showChat);
   const messagesEndRef = useRef(null);
@@ -589,12 +603,18 @@ export default function App() {
       const isMe = message.nickname === userNickname || message.userId === newSocket.id;
 
       if (!isMe) {
-        playChatSound('receive');
-        setShowChat(true);
+        if (dndModeRef.current) {
+          if (!showChatRef.current) {
+            setUnreadCount(prev => prev + 1);
+          }
+        } else {
+          playChatSound('receive');
+          setShowChat(true);
+        }
       }
 
       // Desktop notification cho tin nhắn mới từ người khác
-      if (!isMe && 'Notification' in window && Notification.permission === 'granted') {
+      if (!isMe && !dndModeRef.current && 'Notification' in window && Notification.permission === 'granted') {
         new Notification(`${message.emoji || '💬'} ${message.nickname} vừa nhắn`, {
           body: message.message || message.text,
         });
@@ -675,6 +695,17 @@ export default function App() {
         emoji: data.emoji || '📢',
         text: `${actionText} ${data.details}`
       });
+    });
+
+    // Lắng nghe cập nhật học chung trong phòng
+    newSocket.on('study-session-updated', (session) => {
+      console.log('📖 Study session updated:', session);
+      setStudySession(session);
+    });
+
+    newSocket.on('study-session-ended', () => {
+      console.log('⏹️ Study session ended');
+      setStudySession(null);
     });
 
     // Lắng nghe connection error
@@ -877,6 +908,8 @@ export default function App() {
     setShowChangeRoom(false);
     setRoomInputModal('');
 
+    setStudySession(null); // Reset study session khi chuyển phòng để tránh hiển thị nhầm dữ liệu phòng cũ
+
     if (socket && socketConnected) {
       socket.emit('user-join', {
         nickname: userNickname,
@@ -888,6 +921,15 @@ export default function App() {
       try {
         const res = await fetch(`${SOCKET_SERVER_URL}/api/rooms/${roomId}/messages`);
         if (res.ok) setMessages(await res.json());
+      } catch (_) {}
+
+      // Lấy trạng thái học nhóm của phòng mới
+      try {
+        const sessionRes = await fetch(`${SOCKET_SERVER_URL}/api/rooms/${roomId}/study-session`);
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          setStudySession(sessionData);
+        }
       } catch (_) {}
     }
   };
@@ -1281,9 +1323,30 @@ export default function App() {
   };
 
   // Quản lý các view qua conditional rendering trong khối return chính để giữ Chat widget luôn hoạt động
+  const getThemeClasses = () => {
+    switch (appTheme) {
+      case 'white':
+        return 'bg-white text-slate-900';
+      case 'black':
+        return 'dark-theme';
+      case 'pink':
+        return 'pink-theme';
+      case 'mint':
+        return 'mint-theme';
+      case 'sunset':
+        return 'sunset-theme';
+      case 'cosmic':
+        return 'cosmic-theme';
+      case 'cyberpunk':
+        return 'cyberpunk-theme';
+      case 'default':
+      default:
+        return 'bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50 text-slate-800';
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50 font-sans text-slate-800 p-4 md:p-6 lg:p-8">
+    <div className={`min-h-screen font-sans p-4 md:p-6 lg:p-8 transition-colors duration-500 ${getThemeClasses()}`}>
       
       {/* TOAST ACHIEVEMENT HUY HIỆU */}
       {toastBadge && (
@@ -1421,7 +1484,20 @@ export default function App() {
       <div className="max-w-7xl mx-auto space-y-6">
         
         {/* CONDITIONAL SUB-PAGES */}
-        {showTimetable ? (
+        {showSharedStudyRoom ? (
+          <SharedStudyRoom
+            socket={socket}
+            socketConnected={socketConnected}
+            currentRoom={currentRoom}
+            userNickname={userNickname}
+            userAnimal={userAnimal}
+            addXP={addXP}
+            onClose={() => { setShowSharedStudyRoom(false); handleChangeRoom('global'); }}
+            studySession={studySession}
+            setStudySession={setStudySession}
+            handleChangeRoom={handleChangeRoom}
+          />
+        ) : showTimetable ? (
           <Timetable onClose={() => setShowTimetable(false)} />
         ) : showCommunityQuiz ? (
           <CommunityQuiz 
@@ -1497,6 +1573,26 @@ export default function App() {
               >
                 <BookOpen className="w-4 h-4" />
                 Flashcard
+              </button>
+
+              {/* Button Tùy Biến Giao Diện & Cài Đặt */}
+              <button 
+                onClick={() => setShowSettingsModal(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white rounded-2xl transition font-semibold text-sm shadow-md"
+                title="Cài đặt & Tùy biến màu sắc"
+              >
+                <Palette className="w-4 h-4" />
+                🎨 Tùy biến
+              </button>
+
+              {/* Button Phòng Học Chung */}
+              <button 
+                onClick={() => setShowSharedStudyRoom(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition font-semibold text-sm shadow-md animate-pulse"
+                title="Phòng Học Nhóm & Vote bài tập"
+              >
+                <Users className="w-4 h-4" />
+                Phòng Học
               </button>
 
               {/* Button Chat */}
@@ -1993,7 +2089,18 @@ export default function App() {
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Học viên</div>
-                        <div className="text-sm font-black text-slate-700 truncate max-w-[120px]">{userNickname || 'Khách'}</div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-black text-slate-700 truncate max-w-[120px]" title={userNickname || 'Khách'}>
+                            {userNickname || 'Khách'}
+                          </span>
+                          <button 
+                            onClick={() => setShowSettingsModal(true)} 
+                            className="text-slate-400 hover:text-indigo-600 transition-colors p-0.5 rounded-full hover:bg-slate-100"
+                            title="Đổi tên & cấu hình"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <span className="text-[10px] font-black uppercase bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100">
@@ -2572,6 +2679,161 @@ export default function App() {
                 >
                   <DoorOpen className="w-5 h-5" />
                   Vào phòng học!
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL CÀI ĐẶT & TÙY BIẾN GIAO DIỆN */}
+        {showSettingsModal && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-lg border border-slate-100 animate-in zoom-in-95 duration-300 relative overflow-hidden text-slate-800">
+              {/* Header */}
+              <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+                <h3 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+                  <Palette className="w-6 h-6 text-indigo-600 animate-pulse" />
+                  Cài đặt & Tùy biến giao diện
+                </h3>
+                <button 
+                  onClick={() => setShowSettingsModal(false)}
+                  className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Body Content */}
+              <div className="py-5 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-thin">
+                {/* 1. TÊN & THÚ CƯNG */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">👤 Thông tin cá nhân</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1.5 font-sans">Nickname của bạn</label>
+                      <input 
+                        type="text" 
+                        id="settingNickname"
+                        defaultValue={userNickname}
+                        placeholder="Nhập tên..."
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-medium text-slate-700 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1.5 font-sans">Con thú đại diện</label>
+                      <select 
+                        id="settingAnimal"
+                        defaultValue={userAnimal}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-medium text-slate-700 text-sm"
+                      >
+                        {ANIMAL_NAMES.map(name => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      const nickname = document.getElementById('settingNickname').value.trim();
+                      const animal = document.getElementById('settingAnimal').value;
+                      if (!nickname) {
+                        alert("Nickname không được để trống!");
+                        return;
+                      }
+                      // Update nickname & animal
+                      localStorage.setItem('exam_master_nickname', nickname);
+                      localStorage.setItem('exam_master_animal', animal);
+                      setUserNickname(nickname);
+                      setUserAnimal(animal);
+                      setIsNicknameSet(true);
+                      
+                      // Notify user
+                      setToastNotification({
+                        title: "Thành công!",
+                        message: "Đã cập nhật thông tin cá nhân của bạn.",
+                        type: "success"
+                      });
+                      setTimeout(() => setToastNotification(null), 3000);
+                    }}
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-md active:scale-[0.98]"
+                  >
+                    Lưu thông tin cá nhân
+                  </button>
+                </div>
+
+                <hr className="border-slate-100" />
+
+                {/* 2. CHẾ ĐỘ KHÔNG LÀM PHIỀN */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">🔕 Chế độ làm phiền</h4>
+                  <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div>
+                      <div className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
+                        {dndMode ? "🔕 Không làm phiền đang BẬT" : "🔔 Không làm phiền đang TẮT"}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        Khi bật: Tin nhắn mới đến sẽ không tự động bật cửa sổ chat, không phát tiếng chuông báo và không hiển thị thông báo.
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const newVal = !dndMode;
+                        setDndMode(newVal);
+                        localStorage.setItem('exam_master_dnd', String(newVal));
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${dndMode ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                    >
+                      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${dndMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                </div>
+
+                <hr className="border-slate-100" />
+
+                {/* 3. TÙY CHỌN MÀU NỀN HỌC TẬP */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider">🎨 Màu nền ứng dụng (Theme)</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { id: 'default', name: 'Lavender', color: 'bg-indigo-100 border-indigo-300 text-indigo-700', preview: 'linear-gradient(to right, #6366f1, #8b5cf6)' },
+                      { id: 'white', name: 'Trắng Sáng', color: 'bg-slate-50 border-slate-300 text-slate-800', preview: '#ffffff' },
+                      { id: 'black', name: 'Đen Huyền', color: 'bg-slate-900 border-slate-700 text-slate-100', preview: '#090d16' },
+                      { id: 'pink', name: 'Hồng Cute', color: 'bg-pink-100 border-pink-300 text-pink-700', preview: '#fff1f2' },
+                      { id: 'mint', name: 'Bạc Hà', color: 'bg-emerald-100 border-emerald-300 text-emerald-700', preview: '#f0fdf4' },
+                      { id: 'sunset', name: 'Hoàng Hôn', color: 'bg-amber-100 border-amber-300 text-amber-700', preview: '#fffbeb' },
+                      { id: 'cosmic', name: 'Vũ Trụ', color: 'bg-indigo-950 border-indigo-900 text-indigo-200', preview: '#0b0720' },
+                      { id: 'cyberpunk', name: 'Cyberpunk', color: 'bg-zinc-950 border-pink-500 text-yellow-400', preview: 'linear-gradient(45deg, #09090b, #ec4899)' },
+                    ].map(theme => (
+                      <button
+                        key={theme.id}
+                        onClick={() => {
+                          setAppTheme(theme.id);
+                          localStorage.setItem('exam_master_theme', theme.id);
+                        }}
+                        className={`flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all text-center relative overflow-hidden group ${
+                          appTheme === theme.id ? 'border-indigo-600 scale-[1.02] shadow-md bg-indigo-50/20' : 'border-slate-200 hover:border-slate-300 bg-white hover:scale-[1.01]'
+                        }`}
+                      >
+                        <div 
+                          style={{ background: theme.preview }}
+                          className="w-10 h-10 rounded-full border border-slate-200 shadow-sm shrink-0 flex items-center justify-center font-bold text-xs text-white"
+                        >
+                          {appTheme === theme.id && '✓'}
+                        </div>
+                        <span className="text-xs font-black tracking-tight">{theme.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="pt-4 border-t border-slate-100 flex justify-end">
+                <button
+                  onClick={() => setShowSettingsModal(false)}
+                  className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors"
+                >
+                  Hoàn tất
                 </button>
               </div>
             </div>

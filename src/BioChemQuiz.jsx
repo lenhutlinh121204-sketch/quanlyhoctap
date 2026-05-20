@@ -1,6 +1,278 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Activity, Timer, Trophy, Flame, Play, RefreshCw, Stethoscope, BookOpen, ChevronRight, CheckCircle2, XCircle, X, Puzzle, UserCircle, UserPlus, LogOut } from 'lucide-react';
 
+// ==================== TRỰC QUAN HÓA MINH HỌA BẰNG AI VÀ HÌNH VẼ ĐẸP ====================
+const SubjectIllustration = ({ questionText }) => {
+  const text = (questionText || '').toLowerCase();
+  
+  if (text.includes('hóa') || text.includes('axit') || text.includes('acid') || text.includes('brom') || text.includes('phản ứng') || text.includes('chemical') || text.includes('chất') || text.includes('dung dịch') || text.includes('coomassie') || text.includes('nhuộm')) {
+    return (
+      <svg className="w-14 h-14 text-emerald-500 animate-pulse" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="flaskGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#10B981" />
+            <stop offset="100%" stopColor="#059669" />
+          </linearGradient>
+        </defs>
+        <path d="M26 12H38V22L48 44C50 48 47 52 42 52H22C17 52 14 48 16 44L26 22V12Z" stroke="#059669" strokeWidth="3" strokeLinejoin="round" />
+        <path d="M19.5 44C25 44 23 40 32 40C41 40 39 44 44.5 44L47.5 44L42 52H22L16.5 44H19.5Z" fill="url(#flaskGrad)" opacity="0.8" />
+        <line x1="28" y1="28" x2="33" y2="28" stroke="#374151" strokeWidth="2" />
+        <circle cx="32" cy="30" r="3" fill="#34D399" className="animate-ping" style={{ animationDuration: '2s' }} />
+        <circle cx="28" cy="36" r="2" fill="#34D399" className="animate-ping" style={{ animationDuration: '3s' }} />
+        <circle cx="36" cy="35" r="2.5" fill="#6EE7B7" className="animate-bounce" />
+      </svg>
+    );
+  }
+  
+  if (text.includes('dna') || text.includes('rna') || text.includes('gen') || text.includes('nhiễm sắc thể') || text.includes('di truyền') || text.includes('nucleotit') || text.includes('sinh học') || text.includes('tế bào') || text.includes('màng') || text.includes('vi khuẩn')) {
+    return (
+      <svg className="w-14 h-14 text-indigo-500 animate-[spin_15s_linear_infinite]" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="dnaGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#4F46E5" />
+            <stop offset="100%" stopColor="#818CF8" />
+          </linearGradient>
+          <linearGradient id="dnaGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#EC4899" />
+            <stop offset="100%" stopColor="#F472B6" />
+          </linearGradient>
+        </defs>
+        <path d="M12 12C20 12 24 52 32 52C40 52 44 12 52 12" stroke="url(#dnaGrad1)" strokeWidth="4" strokeLinecap="round" />
+        <path d="M12 52C20 52 24 12 32 12C40 12 44 52 52 52" stroke="url(#dnaGrad2)" strokeWidth="4" strokeLinecap="round" />
+        <line x1="22" y1="24" x2="22" y2="40" stroke="#9CA3AF" strokeWidth="2" strokeDasharray="2 2" />
+        <line x1="32" y1="12" x2="32" y2="52" stroke="#9CA3AF" strokeWidth="2" strokeDasharray="2 2" />
+        <line x1="42" y1="24" x2="42" y2="40" stroke="#9CA3AF" strokeWidth="2" strokeDasharray="2 2" />
+        <circle cx="22" cy="24" r="3.5" fill="#4F46E5" />
+        <circle cx="22" cy="40" r="3.5" fill="#EC4899" />
+        <circle cx="42" cy="24" r="3.5" fill="#EC4899" />
+        <circle cx="42" cy="40" r="3.5" fill="#4F46E5" />
+      </svg>
+    );
+  }
+  
+  if (text.includes('protein') || text.includes('enzyme') || text.includes('albumin') || text.includes('amin') || text.includes('peptid') || text.includes('globulin') || text.includes('hemoglobin')) {
+    return (
+      <svg className="w-14 h-14 text-rose-500 animate-pulse" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="protGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#F43F5E" />
+            <stop offset="100%" stopColor="#FDA4AF" />
+          </linearGradient>
+        </defs>
+        <path d="M12 32C12 20 22 16 32 32C42 48 52 44 52 32" stroke="url(#protGrad)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="22" cy="24" r="5" fill="#FB7185" />
+        <circle cx="32" cy="32" r="6" fill="#F43F5E" />
+        <circle cx="42" cy="40" r="5.5" fill="#FDA4AF" />
+        <circle cx="16" cy="34" r="4.5" fill="#E11D48" />
+        <circle cx="48" cy="28" r="4" fill="#FECDD3" />
+        <line x1="22" y1="24" x2="32" y2="32" stroke="#FDA4AF" strokeWidth="1.5" strokeDasharray="3 3" />
+        <line x1="42" y1="40" x2="32" y2="32" stroke="#FDA4AF" strokeWidth="1.5" strokeDasharray="3 3" />
+      </svg>
+    );
+  }
+
+  if (text.includes('toán') || text.includes('lý') || text.includes('vật lý') || text.includes('hình') || text.includes('số') || text.includes('phép tính') || text.includes('lực') || text.includes('điện') || text.includes('vận tốc') || text.includes('năng lượng')) {
+    return (
+      <svg className="w-14 h-14 text-blue-500" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="atomGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#3B82F6" />
+            <stop offset="100%" stopColor="#60A5FA" />
+          </linearGradient>
+        </defs>
+        <ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate(30 32 32)" stroke="#93C5FD" strokeWidth="2" />
+        <ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate(-30 32 32)" stroke="#93C5FD" strokeWidth="2" />
+        <ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate(90 32 32)" stroke="#93C5FD" strokeWidth="2" />
+        <circle cx="32" cy="32" r="6.5" fill="url(#atomGrad)" />
+        <circle cx="14" cy="22" r="3.5" fill="#2563EB" className="animate-[ping_1.5s_infinite]" />
+        <circle cx="50" cy="42" r="3" fill="#3B82F6" className="animate-bounce" />
+        <circle cx="32" cy="58" r="3" fill="#1D4ED8" />
+      </svg>
+    );
+  }
+
+  if (text.includes('tiếng anh') || text.includes('anh') || text.includes('từ vựng') || text.includes('ngữ pháp') || text.includes('dịch') || text.includes('english')) {
+    return (
+      <svg className="w-14 h-14 text-cyan-500 animate-bounce" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 16H42C46.5 16 50 19.5 50 24V40C50 44.5 46.5 48 42 48H22L12 56V16Z" fill="#E0F7FA" stroke="#00ACC1" strokeWidth="3" strokeLinejoin="round" />
+        <text x="16" y="38" fill="#006064" fontSize="16" fontWeight="extrabold" fontFamily="sans-serif">A B C</text>
+        <circle cx="48" cy="18" r="4.5" fill="#00E5FF" />
+      </svg>
+    );
+  }
+
+  if (text.includes('văn') || text.includes('sử') || text.includes('địa') || text.includes('lịch sử') || text.includes('địa lý') || text.includes('nhà thơ') || text.includes('nhà văn') || text.includes('tác phẩm')) {
+    return (
+      <svg className="w-14 h-14 text-amber-600" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 12H44C48 12 50 15 50 18V46C50 49 48 52 44 52H14C10 52 8 49 8 46V18C8 15 10 12 14 12Z" fill="#FFFBEB" stroke="#B45309" strokeWidth="2.5" />
+        <path d="M46 16V48" stroke="#D97706" strokeWidth="1.5" strokeDasharray="3 3" />
+        <line x1="16" y1="22" x2="38" y2="22" stroke="#78350F" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="16" y1="30" x2="34" y2="30" stroke="#78350F" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="16" y1="38" x2="38" y2="38" stroke="#78350F" strokeWidth="2.5" strokeLinecap="round" />
+        <line x1="16" y1="46" x2="28" y2="46" stroke="#78350F" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M42 46L54 20C54.5 19 55.5 19 56 19.5C56.5 20 56.5 21 55.5 22L46 48L42 46Z" fill="#F59E0B" stroke="#78350F" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className="w-14 h-14 text-amber-500 animate-bounce" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="mangoBodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FBBF24" />
+          <stop offset="60%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#D97706" />
+        </linearGradient>
+      </defs>
+      <path d="M32 8C44 8 50 18 50 32C50 48 40 56 32 56C24 56 14 48 14 32C14 18 20 8 32 8Z" fill="url(#mangoBodyGrad)" />
+      <path d="M32 8C32 2 37 1 40 2C42 4 39 8 32 8Z" fill="#10B981" />
+      <path d="M32 8V6" stroke="#78350F" strokeWidth="2" />
+      <circle cx="26" cy="30" r="3" fill="#1F2937" />
+      <circle cx="38" cy="30" r="3" fill="#1F2937" />
+      <circle cx="27" cy="29" r="1" fill="#FFFFFF" />
+      <circle cx="39" cy="29" r="1" fill="#FFFFFF" />
+      <circle cx="22" cy="34" r="2.5" fill="#EF4444" opacity="0.6" />
+      <circle cx="42" cy="34" r="2.5" fill="#EF4444" opacity="0.6" />
+      <path d="M29 36C29 38 35 38 35 36" stroke="#1F2937" strokeWidth="2" strokeLinecap="round" />
+      <path d="M10 20L12 22M12 20L10 22" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round" />
+      <path d="M52 24L54 26M54 24L52 26" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+};
+
+const renderLectureExplanation = (text, questionText = '') => {
+  if (!text) return null;
+
+  const sections = text.split(/###\s*/);
+  const renderedSections = [];
+  
+  const parseInlineFormatting = (str) => {
+    if (!str) return '';
+    const parts = [];
+    let currentIdx = 0;
+    const regex = /\*\*([^*]+)\*\*/g;
+    let match;
+    
+    while ((match = regex.exec(str)) !== null) {
+      const precedingText = str.slice(currentIdx, match.index);
+      if (precedingText) {
+        parts.push(precedingText);
+      }
+      parts.push(
+        <strong key={match.index} className="font-black text-indigo-950 bg-indigo-50 px-1.5 py-0.5 rounded mx-0.5 border border-indigo-200/40">
+          {match[1]}
+        </strong>
+      );
+      currentIdx = regex.lastIndex;
+    }
+    
+    const remainingText = str.slice(currentIdx);
+    if (remainingText) {
+      parts.push(remainingText);
+    }
+    
+    return parts.length > 0 ? parts : str;
+  };
+
+  sections.forEach((section, idx) => {
+    const trimmed = section.trim();
+    if (!trimmed) return;
+
+    const lines = trimmed.split('\n');
+    const headingLine = lines[0].trim();
+    const bodyText = lines.slice(1).join('\n').trim();
+
+    let cardTheme = "indigo";
+    let icon = "💡";
+    let bgGradient = "from-slate-50 to-white";
+    let borderColor = "border-slate-200/80";
+    let titleColor = "text-slate-800";
+    
+    if (headingLine.toLowerCase().includes("sai") || headingLine.includes("❌")) {
+      cardTheme = "red";
+      icon = "🎯";
+      bgGradient = "from-rose-50/60 to-white";
+      borderColor = "border-rose-100";
+      titleColor = "text-rose-950 font-black";
+    } else if (headingLine.toLowerCase().includes("đúng") || headingLine.includes("✅")) {
+      cardTheme = "emerald";
+      icon = "🔬";
+      bgGradient = "from-emerald-50/60 to-white";
+      borderColor = "border-emerald-100";
+      titleColor = "text-emerald-950 font-black";
+    } else if (headingLine.toLowerCase().includes("mẹo") || headingLine.includes("💡") || headingLine.toLowerCase().includes("nhớ")) {
+      cardTheme = "amber";
+      icon = "💡";
+      bgGradient = "from-amber-50/70 via-yellow-50/20 to-white";
+      borderColor = "border-amber-200 shadow-md shadow-amber-50/20";
+      titleColor = "text-amber-950 font-black";
+    }
+
+    const paragraphs = bodyText.split('\n').filter(p => p.trim() !== '');
+
+    renderedSections.push(
+      <div 
+        key={idx} 
+        className={`rounded-2xl border ${borderColor} bg-gradient-to-br ${bgGradient} p-5 space-y-3 shadow-sm hover:shadow transition-all duration-300 relative overflow-hidden`}
+      >
+        <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-10 bg-current pointer-events-none text-${cardTheme}-600`} />
+
+        <h5 className={`text-sm md:text-base font-extrabold flex items-center gap-2 ${titleColor} border-b pb-2 ${borderColor}/50`}>
+          <span className="text-xl">{icon}</span>
+          <span>{headingLine}</span>
+        </h5>
+        
+        <div className="text-slate-700 text-sm leading-relaxed space-y-2.5">
+          {paragraphs.map((p, pIdx) => {
+            const pTrim = p.trim();
+            if (pTrim.startsWith('-') || pTrim.startsWith('👉') || pTrim.startsWith('•')) {
+              const cleanedText = pTrim.replace(/^[-•👉]\s*/, '');
+              return (
+                <div key={pIdx} className="flex items-start gap-2 pl-2">
+                  <span className="text-indigo-500 mt-1 select-none">✦</span>
+                  <p className="flex-1 text-slate-700 leading-relaxed">
+                    {parseInlineFormatting(cleanedText)}
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <p key={pIdx} className="leading-relaxed">
+                {parseInlineFormatting(pTrim)}
+              </p>
+            );
+          })}
+        </div>
+      </div>
+    );
+  });
+
+  return (
+    <div className="space-y-5 animate-in fade-in slide-in-from-top-4 duration-300 select-text">
+      {questionText && (
+        <div className="flex flex-col md:flex-row items-center gap-5 bg-gradient-to-br from-violet-50 to-indigo-50/40 rounded-2xl p-5 border border-indigo-100/60 shadow-sm shrink-0">
+          <div className="w-20 h-20 shrink-0 flex items-center justify-center bg-white rounded-2xl shadow-inner border border-indigo-50">
+            <SubjectIllustration questionText={questionText} />
+          </div>
+          <div className="space-y-1 text-center md:text-left">
+            <h6 className="font-bold text-slate-800 text-sm flex items-center justify-center md:justify-start gap-1">
+              <span>🎨 Tranh Minh Họa AI Sinh Động</span>
+              <span className="text-[10px] uppercase font-black tracking-widest text-indigo-500 bg-indigo-100/80 px-2 py-0.5 rounded-full">Trực quan hóa</span>
+            </h6>
+            <p className="text-slate-500 text-xs leading-normal">
+              Hình ảnh trực quan hóa chủ đề kiến thức của câu hỏi này giúp bạn kích thích bán cầu não phải để ghi nhớ thông tin nhanh gấp 3 lần!
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {renderedSections}
+      </div>
+    </div>
+  );
+};
+
 const labData = [
   { category: "Đường", name: "Glucose", value: "75-115 mg/dL (4,2-6,4 mmol/L)" },
   { category: "Đường", name: "HbA1c", value: "> 6,5%" },
@@ -616,11 +888,8 @@ Tại sao trị số này lại quan trọng và ý nghĩa lâm sàng của nó 
 
                     {/* AI Explanation Section */}
                     {aiExplanations[item.name] ? (
-                      <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100/50 text-xs text-indigo-950 font-medium leading-relaxed animate-in slide-in-from-top duration-300">
-                        <div className="flex items-center gap-1.5 font-bold text-indigo-600 mb-1.5 text-[13px]">
-                          <span>🧠</span> AI Giải Thích Lâm Sàng & Mẹo Nhớ:
-                        </div>
-                        {aiExplanations[item.name]}
+                      <div className="p-5 bg-white rounded-3xl border-2 border-slate-100 shadow-sm text-xs text-slate-800 font-medium leading-relaxed animate-in slide-in-from-top duration-300 space-y-4">
+                        {renderLectureExplanation(aiExplanations[item.name], item.name)}
                       </div>
                     ) : (
                       <button

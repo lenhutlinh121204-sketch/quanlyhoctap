@@ -93,6 +93,14 @@ app.get('/api/rooms/:roomId/users', (req, res) => {
   res.json(Object.values(room.users).filter(u => u.online));
 });
 
+// Trạng thái học nhóm theo phòng
+app.get('/api/rooms/:roomId/study-session', (req, res) => {
+  const { roomId } = req.params;
+  const room = rooms[roomId];
+  if (!room || !room.studySession) return res.json(null);
+  res.json(room.studySession);
+});
+
 // Legacy: backward compat → trỏ về phòng global
 app.get('/api/messages', (req, res) => {
   const room = rooms['global'];
@@ -193,6 +201,11 @@ io.on('connection', (socket) => {
 
     console.log(`[JOIN] ${nickname} (${animalName}) → phòng "${roomId}" - ${socket.id}`);
 
+    // Gửi trạng thái học chung hiện tại nếu có
+    if (room.studySession && room.studySession.active) {
+      socket.emit('study-session-updated', room.studySession);
+    }
+
     io.emit('user-joined', {
       users: getAllOnlineUsers(),
       message: `${nickname} (${animalName}) vừa tham gia phòng "${roomId}"!`,
@@ -269,6 +282,126 @@ io.on('connection', (socket) => {
         roomId,
       });
     }
+  });
+
+  // ==================== SHARED STUDY ROOM EVENTS ====================
+  // 6. START STUDY SESSION
+  socket.on('start-study-session', (payload) => {
+    const { quizTitle, questions, roomId: payloadRoomId } = payload;
+    const roomId = payloadRoomId || socketRoomMap[socket.id];
+    if (!roomId) return;
+    const room = getRoom(roomId);
+    
+    room.studySession = {
+      active: true,
+      quizTitle,
+      questions,
+      currentIndex: 0,
+      currentQuestion: questions[0],
+      votes: {}, // optionIndex -> [array of user socketIds/nicknames]
+      votedUsers: {}, // socketId -> optionIndex
+      revealed: false,
+      createdBy: socket.id
+    };
+    
+    console.log(`[STUDY-START][${roomId}] Session started for quiz "${quizTitle}" by ${socket.id}`);
+    io.to(roomId).emit('study-session-updated', room.studySession);
+    socket.emit('study-session-updated', room.studySession); // Tránh race condition, báo trực tiếp cho socket gửi
+  });
+
+  // 7. SUBMIT VOTE
+  socket.on('submit-vote', (payload) => {
+    const { optionIndex, roomId: payloadRoomId } = payload;
+    const roomId = payloadRoomId || socketRoomMap[socket.id];
+    if (!roomId) return;
+    const room = getRoom(roomId);
+    const session = room.studySession;
+    if (!session || !session.active || session.revealed) return;
+
+    const user = room.users[socket.id];
+    if (!user) return;
+
+    // Check if user already voted
+    const previousVote = session.votedUsers[socket.id];
+    if (previousVote === optionIndex) return; // Voted same thing
+
+    // Remove from previous vote
+    if (previousVote !== undefined && session.votes[previousVote]) {
+      session.votes[previousVote] = session.votes[previousVote].filter(u => u.socketId !== socket.id);
+    }
+
+    // Add to new vote
+    session.votedUsers[socket.id] = optionIndex;
+    if (!session.votes[optionIndex]) {
+      session.votes[optionIndex] = [];
+    }
+    session.votes[optionIndex].push({
+      socketId: socket.id,
+      nickname: user.nickname,
+      animalName: user.animalName,
+      emoji: user.emoji
+    });
+
+    console.log(`[STUDY-VOTE][${roomId}] ${user.nickname} voted option ${optionIndex}`);
+    io.to(roomId).emit('study-session-updated', session);
+    socket.emit('study-session-updated', session);
+  });
+
+  // 8. REVEAL ANSWER
+  socket.on('reveal-answer', (payload) => {
+    const { roomId: payloadRoomId } = payload || {};
+    const roomId = payloadRoomId || socketRoomMap[socket.id];
+    if (!roomId) return;
+    const room = getRoom(roomId);
+    const session = room.studySession;
+    if (!session || !session.active) return;
+
+    session.revealed = true;
+    console.log(`[STUDY-REVEAL][${roomId}] Answer revealed`);
+    io.to(roomId).emit('study-session-updated', session);
+    socket.emit('study-session-updated', session);
+  });
+
+  // 9. NEXT QUESTION
+  socket.on('next-question', (payload) => {
+    const { roomId: payloadRoomId } = payload || {};
+    const roomId = payloadRoomId || socketRoomMap[socket.id];
+    if (!roomId) return;
+    const room = getRoom(roomId);
+    const session = room.studySession;
+    if (!session || !session.active) return;
+
+    const nextIndex = session.currentIndex + 1;
+    if (nextIndex < session.questions.length) {
+      session.currentIndex = nextIndex;
+      session.currentQuestion = session.questions[nextIndex];
+      session.votes = {};
+      session.votedUsers = {};
+      session.revealed = false;
+      console.log(`[STUDY-NEXT][${roomId}] Moved to question index ${nextIndex}`);
+      io.to(roomId).emit('study-session-updated', session);
+      socket.emit('study-session-updated', session);
+    } else {
+      // Completed all questions in the quiz
+      session.active = false;
+      console.log(`[STUDY-COMPLETED][${roomId}] Session completed all questions`);
+      io.to(roomId).emit('study-session-ended');
+      socket.emit('study-session-ended');
+    }
+  });
+
+  // 10. END STUDY SESSION
+  socket.on('end-study-session', (payload) => {
+    const { roomId: payloadRoomId } = payload || {};
+    const roomId = payloadRoomId || socketRoomMap[socket.id];
+    if (!roomId) return;
+    const room = getRoom(roomId);
+    if (room.studySession) {
+      room.studySession.active = false;
+    }
+    console.log(`[STUDY-END][${roomId}] Session ended by user request`);
+    io.to(roomId).emit('study-session-ended');
+    socket.emit('study-session-ended');
   });
 
   // 5. NEW ACTIVITY BROADCAST

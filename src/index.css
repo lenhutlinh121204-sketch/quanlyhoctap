@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,9 +7,277 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==================== THEME STYLES ==================== */
+
+/* transitions for color transitions */
+.transition-colors {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+/* 1. BLACK THEME (Đen huyền bí - Obsidian Navy) */
+.dark-theme {
+  background-image: none !important;
+  background-color: #080c14 !important;
+  color: #f8fafc !important;
+}
+
+.dark-theme .bg-white {
+  background-color: #101726 !important;
+  color: #f8fafc !important;
+  border-color: #1e293b !important;
+}
+
+.dark-theme .text-slate-900,
+.dark-theme .text-slate-800,
+.dark-theme .text-slate-700,
+.dark-theme .text-slate-600 {
+  color: #f1f5f9 !important;
+}
+
+.dark-theme .text-slate-500,
+.dark-theme .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+.dark-theme .bg-slate-50,
+.dark-theme .bg-slate-100 {
+  background-color: #0c111c !important;
+  color: #f1f5f9 !important;
+  border-color: #1e293b !important;
+}
+
+.dark-theme .border-slate-100,
+.dark-theme .border-slate-200 {
+  border-color: #1e293b !important;
+}
+
+.dark-theme input,
+.dark-theme select,
+.dark-theme textarea {
+  background-color: #0c111c !important;
+  color: #f1f5f9 !important;
+  border-color: #2e3c54 !important;
+}
+
+.dark-theme .bg-indigo-600 {
+  background-color: #3b82f6 !important;
+}
+.dark-theme .hover\:bg-indigo-700:hover {
+  background-color: #2563eb !important;
+}
+
+/* 2. PINK THEME (Hồng ngọt ngào - Strawberry Cream) */
+.pink-theme {
+  background-image: none !important;
+  background-color: #fff1f2 !important;
+}
+
+.pink-theme .bg-white {
+  background-color: #ffffff !important;
+  border-color: #ffe4e6 !important;
+}
+
+.pink-theme .text-slate-900,
+.pink-theme .text-slate-800,
+.pink-theme .text-slate-700 {
+  color: #4c0519 !important;
+}
+
+.pink-theme .bg-slate-50,
+.pink-theme .bg-slate-100 {
+  background-color: #fff8f8 !important;
+  border-color: #fecdd3 !important;
+}
+
+.pink-theme .border-slate-100,
+.pink-theme .border-slate-200 {
+  border-color: #fecdd3 !important;
+}
+
+.pink-theme .bg-indigo-600 {
+  background-color: #ec4899 !important;
+}
+.pink-theme .hover\:bg-indigo-700:hover {
+  background-color: #db2777 !important;
+}
+
+/* 3. MINT THEME (Xanh bạc hà - Cool Mint) */
+.mint-theme {
+  background-image: none !important;
+  background-color: #f0fdf4 !important;
+}
+
+.mint-theme .bg-white {
+  background-color: #ffffff !important;
+  border-color: #dcfce7 !important;
+}
+
+.mint-theme .text-slate-900,
+.mint-theme .text-slate-800,
+.mint-theme .text-slate-700 {
+  color: #052e16 !important;
+}
+
+.mint-theme .bg-slate-50,
+.mint-theme .bg-slate-100 {
+  background-color: #f6fdf9 !important;
+  border-color: #bbf7d0 !important;
+}
+
+.mint-theme .border-slate-100,
+.mint-theme .border-slate-200 {
+  border-color: #bbf7d0 !important;
+}
+
+.mint-theme .bg-indigo-600 {
+  background-color: #10b981 !important;
+}
+.mint-theme .hover\:bg-indigo-700:hover {
+  background-color: #059669 !important;
+}
+
+/* 4. SUNSET THEME (Hoàng hôn ấm áp - Soft Gold) */
+.sunset-theme {
+  background-image: none !important;
+  background-color: #fffbeb !important;
+}
+
+.sunset-theme .bg-white {
+  background-color: #ffffff !important;
+  border-color: #fef3c7 !important;
+}
+
+.sunset-theme .text-slate-900,
+.sunset-theme .text-slate-800,
+.sunset-theme .text-slate-700 {
+  color: #451a03 !important;
+}
+
+.sunset-theme .bg-slate-50,
+.sunset-theme .bg-slate-100 {
+  background-color: #fffdf5 !important;
+  border-color: #fde68a !important;
+}
+
+.sunset-theme .border-slate-100,
+.sunset-theme .border-slate-200 {
+  border-color: #fde68a !important;
+}
+
+.sunset-theme .bg-indigo-600 {
+  background-color: #f59e0b !important;
+}
+.sunset-theme .hover\:bg-indigo-700:hover {
+  background-color: #d97706 !important;
+}
+
+/* 5. COSMIC THEME (Vũ trụ huyền ảo - Nebula Violet) */
+.cosmic-theme {
+  background-image: none !important;
+  background-color: #080517 !important;
+  color: #e0e7ff !important;
+}
+
+.cosmic-theme .bg-white {
+  background-color: #131030 !important;
+  color: #e0e7ff !important;
+  border-color: #2c2368 !important;
+}
+
+.cosmic-theme .text-slate-900,
+.cosmic-theme .text-slate-800,
+.cosmic-theme .text-slate-700,
+.cosmic-theme .text-slate-600 {
+  color: #e0e7ff !important;
+}
+
+.cosmic-theme .text-slate-500,
+.cosmic-theme .text-slate-400 {
+  color: #a5b4fc !important;
+}
+
+.cosmic-theme .bg-slate-50,
+.cosmic-theme .bg-slate-100 {
+  background-color: #0f0b24 !important;
+  color: #e0e7ff !important;
+  border-color: #2c2368 !important;
+}
+
+.cosmic-theme .border-slate-100,
+.cosmic-theme .border-slate-200 {
+  border-color: #2c2368 !important;
+}
+
+.cosmic-theme input,
+.cosmic-theme select,
+.cosmic-theme textarea {
+  background-color: #0f0b24 !important;
+  color: #e0e7ff !important;
+  border-color: #4f46e5 !important;
+}
+
+.cosmic-theme .bg-indigo-600 {
+  background-color: #6366f1 !important;
+}
+.cosmic-theme .hover\:bg-indigo-700:hover {
+  background-color: #4f46e5 !important;
+}
+
+/* 6. CYBERPUNK THEME (Neon tương lai) */
+.cyberpunk-theme {
+  background-image: none !important;
+  background-color: #030303 !important;
+}
+
+.cyberpunk-theme .bg-white {
+  background-color: #121214 !important;
+  color: #facc15 !important;
+  border-color: #ec4899 !important;
+}
+
+.cyberpunk-theme .text-slate-900,
+.cyberpunk-theme .text-slate-800,
+.cyberpunk-theme .text-slate-700,
+.cyberpunk-theme .text-slate-600 {
+  color: #facc15 !important;
+}
+
+.cyberpunk-theme .text-slate-500,
+.cyberpunk-theme .text-slate-400 {
+  color: #a1a1aa !important;
+}
+
+.cyberpunk-theme .bg-slate-50,
+.cyberpunk-theme .bg-slate-100 {
+  background-color: #050508 !important;
+  color: #facc15 !important;
+  border-color: #ec4899 !important;
+}
+
+.cyberpunk-theme .border-slate-100,
+.cyberpunk-theme .border-slate-200 {
+  border-color: #ec4899 !important;
+}
+
+.cyberpunk-theme input,
+.cyberpunk-theme select,
+.cyberpunk-theme textarea {
+  background-color: #050508 !important;
+  color: #facc15 !important;
+  border-color: #ec4899 !important;
+}
+
+.cyberpunk-theme .bg-indigo-600 {
+  background-color: #d946ef !important;
+  color: #fff !important;
+}
+.cyberpunk-theme .hover\:bg-indigo-700:hover {
+  background-color: #c084fc !important;
 }
