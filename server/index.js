@@ -41,6 +41,24 @@ function normalizeRoomId(raw) {
   return trimmed === '' ? 'global' : trimmed;
 }
 
+function getAllOnlineUsers() {
+  const allUsers = [];
+  const seenNicknames = new Set();
+  
+  // Duyệt qua tất cả các phòng để lấy người dùng online
+  Object.keys(rooms).forEach(roomId => {
+    const room = rooms[roomId];
+    Object.values(room.users).forEach(user => {
+      if (user.online && !seenNicknames.has(user.nickname)) {
+        seenNicknames.add(user.nickname);
+        allUsers.push(user);
+      }
+    });
+  });
+  
+  return allUsers;
+}
+
 // ==================== REST API ====================
 
 app.get('/health', (req, res) => {
@@ -134,7 +152,7 @@ io.on('connection', (socket) => {
 
   // 1. USER JOINS (hoặc đổi phòng)
   socket.on('user-join', (userData) => {
-    const { nickname, animalName, emoji, progress, roomId: rawRoomId } = userData;
+    const { nickname, animalName, emoji, progress, statusText, isFocusing, roomId: rawRoomId } = userData;
     const roomId = normalizeRoomId(rawRoomId);
 
     // Rời phòng cũ nếu đang ở phòng khác
@@ -143,11 +161,11 @@ io.on('connection', (socket) => {
       const prevRoom = rooms[prevRoomId];
       if (prevRoom && prevRoom.users[socket.id]) {
         delete prevRoom.users[socket.id];
-        io.to(prevRoomId).emit('user-left', {
+        io.emit('user-left', {
           userId: socket.id,
           nickname,
           message: `${nickname} đã chuyển sang phòng khác!`,
-          users: Object.values(prevRoom.users).filter(u => u.online),
+          users: getAllOnlineUsers(),
           roomId: prevRoomId,
         });
       }
@@ -166,6 +184,8 @@ io.on('connection', (socket) => {
       online: true,
       emoji: emoji || '🙂',
       progress: typeof progress === 'number' ? progress : 0,
+      statusText: statusText || 'Đang học bài',
+      isFocusing: !!isFocusing,
       joinedAt: new Date(),
       socketId: socket.id,
       roomId,
@@ -173,8 +193,8 @@ io.on('connection', (socket) => {
 
     console.log(`[JOIN] ${nickname} (${animalName}) → phòng "${roomId}" - ${socket.id}`);
 
-    io.to(roomId).emit('user-joined', {
-      users: Object.values(room.users).filter(u => u.online),
+    io.emit('user-joined', {
+      users: getAllOnlineUsers(),
       message: `${nickname} (${animalName}) vừa tham gia phòng "${roomId}"!`,
       roomId,
     });
@@ -216,7 +236,7 @@ io.on('connection', (socket) => {
 
   // 3. UPDATE USER STATUS
   socket.on('update-status', (payload) => {
-    const { online, progress } = payload;
+    const { online, progress, statusText, isFocusing } = payload;
     const roomId = socketRoomMap[socket.id];
     if (!roomId) return;
     const room = rooms[roomId];
@@ -224,9 +244,11 @@ io.on('connection', (socket) => {
     if (user) {
       user.online = online;
       if (typeof progress === 'number') user.progress = progress;
-      console.log(`[STATUS][${roomId}] ${user.nickname} - online: ${online}`);
-      io.to(roomId).emit('user-status-updated', {
-        users: Object.values(room.users).filter(u => u.online),
+      if (typeof statusText === 'string') user.statusText = statusText;
+      if (typeof isFocusing === 'boolean') user.isFocusing = isFocusing;
+      console.log(`[STATUS][${roomId}] ${user.nickname} - online: ${online}, progress: ${progress}, statusText: ${statusText}, isFocusing: ${isFocusing}`);
+      io.emit('user-status-updated', {
+        users: getAllOnlineUsers(),
         roomId,
       });
     }
@@ -264,11 +286,11 @@ io.on('connection', (socket) => {
     if (user) {
       console.log(`[DISCONNECT][${roomId}] ${user.nickname} - ${socket.id}`);
       delete room.users[socket.id];
-      io.to(roomId).emit('user-left', {
+      io.emit('user-left', {
         userId: socket.id,
         nickname: user.nickname,
         message: `${user.nickname} đã rời khỏi phòng "${roomId}"!`,
-        users: Object.values(room.users).filter(u => u.online),
+        users: getAllOnlineUsers(),
         roomId,
       });
     }

@@ -220,6 +220,7 @@ export default function App() {
     return localStorage.getItem('exam_master_nickname') || '';
   });
   const [userStatus, setUserStatus] = useState('Đang học bài');
+  const [customStatus, setCustomStatus] = useState('Đang học bài');
   const [userAnimal, setUserAnimal] = useState(() => {
     return localStorage.getItem('exam_master_animal') || DEFAULT_ANIMAL;
   });
@@ -229,11 +230,37 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [usersOnline, setUsersOnline] = useState([]);
+  const [typingUsers, setTypingUsers] = useState({});
+  const [selectedOnlineUser, setSelectedOnlineUser] = useState(null);
   const [showChat, setShowChat] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [toastNotification, setToastNotification] = useState(null);
   const showChatRef = useRef(showChat);
   const messagesEndRef = useRef(null);
+  const [createQuizAttempts, setCreateQuizAttempts] = useState(() => {
+    return parseInt(localStorage.getItem('createQuizAttempts') || '3', 10);
+  });
+  const [takeQuizAttempts, setTakeQuizAttempts] = useState(() => {
+    return parseInt(localStorage.getItem('takeQuizAttempts') || '5', 10);
+  });
+
+  const decrementCreateAttempts = () => {
+    setCreateQuizAttempts(prev => {
+      const next = Math.max(0, prev - 1);
+      localStorage.setItem('createQuizAttempts', next);
+      return next;
+    });
+  };
+
+  const decrementTakeAttempts = () => {
+    setTakeQuizAttempts(prev => {
+      const next = Math.max(0, prev - 1);
+      localStorage.setItem('takeQuizAttempts', next);
+      return next;
+    });
+  };
+
+  const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (showChat) {
@@ -339,6 +366,20 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [toastNotification]);
+
+  useEffect(() => {
+    if (showCommunityQuiz) {
+      setUserStatus('📝 Đang làm trắc nghiệm');
+    } else if (showBioChem) {
+      setUserStatus('🧪 Đang học Hóa Sinh');
+    } else if (showFlashcards) {
+      setUserStatus('🗂️ Đang học Flashcards');
+    } else if (showTimetable) {
+      setUserStatus('📅 Đang xem Thời khóa biểu');
+    } else {
+      setUserStatus(customStatus);
+    }
+  }, [showCommunityQuiz, showBioChem, showFlashcards, showTimetable, customStatus]);
 
   const [userId, setUserId] = useState(() => {
     let saved = localStorage.getItem('exam_master_user_id');
@@ -471,6 +512,28 @@ export default function App() {
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.completed).length;
 
+  const joinDataRef = useRef({
+    nickname: userNickname,
+    animalName: userAnimal,
+    emoji: ANIMAL_EMOJIS[userAnimal] || '🙂',
+    progress: 0,
+    roomId: currentRoom,
+    statusText: userStatus,
+    isFocusing: false
+  });
+
+  useEffect(() => {
+    joinDataRef.current = {
+      nickname: userNickname,
+      animalName: userAnimal,
+      emoji: ANIMAL_EMOJIS[userAnimal] || '🙂',
+      progress: Math.round((completedTasks / totalTasks) * 100) || 0,
+      roomId: currentRoom,
+      statusText: userStatus,
+      isFocusing: isTimerRunning && pomodoroMode === 'work'
+    };
+  }, [userNickname, userAnimal, completedTasks, totalTasks, currentRoom, userStatus, isTimerRunning, pomodoroMode]);
+
   // --- SOCKET.IO INITIALIZATION ---
   useEffect(() => {
     if (!isNicknameSet) return;
@@ -482,7 +545,6 @@ export default function App() {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
     });
 
     // Lắng nghe kết nối
@@ -491,16 +553,8 @@ export default function App() {
       setSocketConnected(true);
       setSocketId(newSocket.id);
 
-      // Gửi thông tin user join (kèm roomId)
-      newSocket.emit('user-join', {
-        nickname: userNickname,
-        animalName: userAnimal,
-        emoji: ANIMAL_EMOJIS[userAnimal],
-        progress: Math.round((completedTasks / totalTasks) * 100) || 0,
-        roomId: currentRoom,
-        statusText: userStatus,
-        isFocusing: isTimerRunning && pomodoroMode === 'work'
-      });
+      // Gửi thông tin user join (kèm roomId) từ ref mới nhất
+      newSocket.emit('user-join', joinDataRef.current);
 
       // Load lịch sử tin nhắn theo phòng
       try {
@@ -532,24 +586,17 @@ export default function App() {
       console.log('📨 New message:', message);
       setMessages(prev => [...prev, message]);
 
-      if (message.userId !== newSocket.id) {
+      const isMe = message.nickname === userNickname || message.userId === newSocket.id;
+
+      if (!isMe) {
         playChatSound('receive');
-        
-        if (!showChatRef.current) {
-          setUnreadCount(prev => prev + 1);
-          setToastNotification({
-            id: Date.now(),
-            sender: message.nickname,
-            emoji: message.emoji || '💬',
-            text: message.message || message.text
-          });
-        }
+        setShowChat(true);
       }
 
       // Desktop notification cho tin nhắn mới từ người khác
-      if (message.userId !== newSocket.id && 'Notification' in window && Notification.permission === 'granted') {
+      if (!isMe && 'Notification' in window && Notification.permission === 'granted') {
         new Notification(`${message.emoji || '💬'} ${message.nickname} vừa nhắn`, {
-          body: message.message,
+          body: message.message || message.text,
         });
       }
     });
@@ -577,6 +624,26 @@ export default function App() {
     newSocket.on('user-left', (data) => {
       console.log('👋 User left:', data);
       setUsersOnline(data.users || []);
+      setTypingUsers(prev => {
+        const next = { ...prev };
+        delete next[data.userId];
+        return next;
+      });
+    });
+
+    // Lắng nghe người dùng đang gõ
+    newSocket.on('user-typing', (data) => {
+      console.log('✍️ User typing:', data);
+      const { userId, nickname, isTyping } = data;
+      setTypingUsers(prev => {
+        const next = { ...prev };
+        if (isTyping) {
+          next[userId] = nickname;
+        } else {
+          delete next[userId];
+        }
+        return next;
+      });
     });
 
     // Lắng nghe lỗi
@@ -749,11 +816,41 @@ export default function App() {
     }
   };
 
+  const handleInputChange = (e) => {
+    setNewMessage(e.target.value);
+    if (!socket || !socketConnected) return;
+
+    if (!typingTimeoutRef.current) {
+      socket.emit('typing', { isTyping: true });
+    } else {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.emit('typing', { isTyping: false });
+      typingTimeoutRef.current = null;
+    }, 1500);
+  };
+
+  const handleTagUser = (nickname) => {
+    setNewMessage(prev => {
+      const trimmed = prev.trim();
+      return trimmed === '' ? `@${nickname} ` : `${trimmed} @${nickname} `;
+    });
+    setSelectedOnlineUser(null);
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !socket || !socketConnected) return;
 
     try {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        socket.emit('typing', { isTyping: false });
+        typingTimeoutRef.current = null;
+      }
+
       socket.emit('send-message', {
         text: newMessage,
         timestamp: Date.now(),
@@ -776,6 +873,7 @@ export default function App() {
     localStorage.setItem('exam_master_room', roomId);
     setCurrentRoom(roomId);
     setMessages([]);
+    setTypingUsers({});
     setShowChangeRoom(false);
     setRoomInputModal('');
 
@@ -849,6 +947,23 @@ export default function App() {
       
       if (pomodoroMode === 'work') {
         addXP(50);
+        setCreateQuizAttempts(prev => {
+          const next = prev + 1;
+          localStorage.setItem('createQuizAttempts', next);
+          return next;
+        });
+        setTakeQuizAttempts(prev => {
+          const next = prev + 3;
+          localStorage.setItem('takeQuizAttempts', next);
+          return next;
+        });
+        setToastNotification({
+          emoji: '🏆',
+          title: 'Hoàn thành Pomodoro!',
+          message: 'Bạn được cộng 50 XP, +1 lượt tạo đề & +3 lượt làm đề!'
+        });
+        setTimeout(() => setToastNotification(null), 5000);
+
         setPomodoroSessionCount(prev => {
           const next = prev + 1;
           if (next >= 4) {
@@ -1170,7 +1285,19 @@ export default function App() {
   }
 
   if (showCommunityQuiz) {
-    return <CommunityQuiz onClose={() => setShowCommunityQuiz(false)} nickname={userNickname} onActivityCreated={addActivityToFeed} addXP={addXP} unlockBadge={unlockBadge} />;
+    return (
+      <CommunityQuiz 
+        onClose={() => setShowCommunityQuiz(false)} 
+        nickname={userNickname} 
+        onActivityCreated={addActivityToFeed} 
+        addXP={addXP} 
+        unlockBadge={unlockBadge} 
+        createQuizAttempts={createQuizAttempts}
+        takeQuizAttempts={takeQuizAttempts}
+        decrementCreateAttempts={decrementCreateAttempts}
+        decrementTakeAttempts={decrementTakeAttempts}
+      />
+    );
   }
 
   if (showBioChem) {
@@ -2494,28 +2621,80 @@ export default function App() {
             {usersOnline.length > 0 && (
               <>
                 {/* Cài đặt trạng thái cá nhân */}
-                <div className="bg-white border-b border-slate-100 p-2 flex items-center gap-2">
+                <div className="bg-white border-b border-slate-100 p-2 flex items-center gap-2 shrink-0">
                   <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Trạng thái:</span>
                   <input 
                     type="text" 
                     value={userStatus}
-                    onChange={(e) => setUserStatus(e.target.value)}
+                    onChange={(e) => {
+                      setUserStatus(e.target.value);
+                      setCustomStatus(e.target.value);
+                    }}
                     placeholder="VD: Đang cày cuốc, Nghỉ ngơi..."
-                    className="flex-1 text-xs px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400"
+                    className="flex-1 text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-400 text-slate-600 font-medium"
                   />
                 </div>
 
                 <div className="bg-slate-50 border-b border-slate-100 p-3 flex gap-4 overflow-x-auto scrollbar-hide shrink-0 shadow-inner">
                   {usersOnline.map(user => (
-                    <div key={user.id} className="flex flex-col items-center gap-1 min-w-[64px]" title={`${user.nickname} - Hoàn thành ${user.progress}%`}>
-                      <div className="relative">
-                        <div className={`w-12 h-12 bg-white rounded-full border-2 p-0.5 flex items-center justify-center text-2xl shadow-sm transition-all ${user.isFocusing ? 'border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse' : 'border-blue-400'}`}>
+                    <div 
+                      key={user.id} 
+                      onClick={() => setSelectedOnlineUser(user)}
+                      className="flex flex-col items-center gap-1 min-w-[64px] cursor-pointer group" 
+                      title={`${user.nickname} - Hoàn thành ${user.progress}%`}
+                    >
+                      <div className="relative w-12 h-12 flex items-center justify-center">
+                        {/* Bánh xe tiến độ SVG */}
+                        <svg className="absolute inset-0 w-full h-full transform -rotate-90 z-0">
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r="21"
+                            stroke="#e2e8f0"
+                            strokeWidth="2.5"
+                            fill="transparent"
+                          />
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r="21"
+                            stroke={user.isFocusing ? "#ef4444" : "#10b981"}
+                            strokeWidth="2.5"
+                            fill="transparent"
+                            strokeDasharray={2 * Math.PI * 21}
+                            strokeDashoffset={2 * Math.PI * 21 * (1 - (user.progress || 0) / 100)}
+                            strokeLinecap="round"
+                            className="transition-all duration-700 ease-out"
+                          />
+                        </svg>
+
+                        {/* Emoji Avatar ở giữa */}
+                        <div className={`w-9 h-9 bg-white rounded-full flex items-center justify-center text-xl shadow-sm z-10 relative transition-transform group-hover:scale-105 ${user.isFocusing ? 'ring-2 ring-red-400 ring-offset-1 animate-pulse' : 'ring-1 ring-slate-100'}`}>
                           {user.emoji}
                         </div>
-                        <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full"></div>
+
+                        {/* Chấm Online */}
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full z-20"></div>
+
+                        {/* Biểu tượng tập trung */}
+                        {user.isFocusing && (
+                          <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold shadow-md z-20 animate-bounce" title="Đang tập trung học (Pomodoro)">
+                            ⏱️
+                          </div>
+                        )}
                       </div>
-                      <span className="text-[10px] font-semibold text-slate-600 truncate w-full text-center">{user.nickname}</span>
-                      <span className="text-[9px] text-slate-400 truncate w-full text-center">{user.statusText || 'Online'}</span>
+                      
+                      <span className="text-[10px] font-bold text-slate-700 truncate w-full text-center mt-0.5 flex items-center justify-center gap-0.5">
+                        {user.nickname}
+                        {user.progress > 0 && (
+                          <span className="text-[8px] font-semibold text-emerald-600 bg-emerald-50 px-1 rounded">
+                            {user.progress}%
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[9px] text-slate-400 truncate w-full text-center max-w-[60px]" title={`${user.statusText || 'Online'} (Phòng: ${user.roomId || 'global'})`}>
+                        {user.statusText || (user.isFocusing ? 'Tập trung' : 'Online')}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -2531,7 +2710,7 @@ export default function App() {
                 </div>
               ) : (
                 messages.map((msg, idx) => {
-                  const isMe = msg.userId === socketId;
+                  const isMe = msg.nickname === userNickname || (socketId && msg.userId === socketId);
                   return (
                     <div key={msg.id || idx} className={`flex gap-2 w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
                       {/* Avatar for others */}
@@ -2557,6 +2736,21 @@ export default function App() {
                   );
                 })
               )}
+
+              {/* Chỉ báo đang gõ chữ (Typing Indicator) */}
+              {Object.keys(typingUsers).length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 italic bg-white/75 backdrop-blur-xs px-3 py-1.5 rounded-xl w-fit shadow-sm animate-pulse">
+                  <span className="flex gap-0.5 items-center">
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  </span>
+                  <span>
+                    {Object.values(typingUsers).join(', ')} đang nhập...
+                  </span>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -2565,7 +2759,7 @@ export default function App() {
               <input 
                 type="text" 
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                onChange={handleInputChange}
                 placeholder="Nhập tin nhắn..."
                 className="flex-1 px-4 py-2.5 bg-slate-100 text-[14px] rounded-full focus:ring-0 focus:bg-slate-200 outline-none transition-colors text-slate-700"
               />
@@ -2577,6 +2771,75 @@ export default function App() {
                 <Send className="w-4 h-4 ml-0.5" />
               </button>
             </form>
+
+            {/* Popup xem thông tin nhanh & Nhắc tên (Tag) */}
+            {selectedOnlineUser && (
+              <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs rounded-2xl flex items-center justify-center p-4 z-30 animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl p-4 w-full max-w-[280px] shadow-2xl border border-slate-100 flex flex-col items-center text-center animate-in scale-in-95 duration-150">
+                  <div className="relative mb-3 w-16 h-16 flex items-center justify-center">
+                    {/* Vòng tiến độ SVG lớn */}
+                    <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                      <circle cx="32" cy="32" r="28" stroke="#e2e8f0" strokeWidth="3" fill="transparent" />
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r="28"
+                        stroke={selectedOnlineUser.isFocusing ? "#ef4444" : "#10b981"}
+                        strokeWidth="3"
+                        fill="transparent"
+                        strokeDasharray={2 * Math.PI * 28}
+                        strokeDashoffset={2 * Math.PI * 28 * (1 - (selectedOnlineUser.progress || 0) / 100)}
+                        strokeLinecap="round"
+                        className="transition-all duration-500"
+                      />
+                    </svg>
+                    <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-3xl shadow-inner border border-slate-100 z-10">
+                      {selectedOnlineUser.emoji}
+                    </div>
+                  </div>
+
+                  <h4 className="font-bold text-slate-800 text-base leading-tight">{selectedOnlineUser.nickname}</h4>
+                  <p className="text-xs text-slate-400 font-medium mb-3">🐾 {selectedOnlineUser.animalName}</p>
+
+                  <div className="w-full bg-slate-50 rounded-xl p-3 mb-4 text-left space-y-2 border border-slate-100">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400 font-semibold">Trạng thái:</span>
+                      <span className="font-semibold text-slate-700 truncate max-w-[140px]" title={selectedOnlineUser.statusText}>
+                        {selectedOnlineUser.isFocusing ? '⏱️ Đang tập trung học' : (selectedOnlineUser.statusText || 'Đang học bài')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400 font-semibold">Phòng chat:</span>
+                      <span className="font-bold text-indigo-600 truncate max-w-[140px] uppercase">
+                        {selectedOnlineUser.roomId || 'global'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400 font-semibold">Tiến độ nhiệm vụ:</span>
+                      <span className="font-bold text-emerald-600">{selectedOnlineUser.progress || 0}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${selectedOnlineUser.progress || 0}%` }}></div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 w-full">
+                    <button
+                      onClick={() => handleTagUser(selectedOnlineUser.nickname)}
+                      className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-1"
+                    >
+                      Nhắc tên
+                    </button>
+                    <button
+                      onClick={() => setSelectedOnlineUser(null)}
+                      className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs rounded-xl transition-colors"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

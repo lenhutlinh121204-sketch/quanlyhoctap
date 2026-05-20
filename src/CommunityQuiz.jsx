@@ -30,7 +30,17 @@ const WRONG_GIFS = [
   '/GIFT/housewives_cat.gif'
 ];
 
-export default function CommunityQuiz({ onClose, nickname, onActivityCreated, addXP, unlockBadge }) {
+export default function CommunityQuiz({ 
+  onClose, 
+  nickname, 
+  onActivityCreated, 
+  addXP, 
+  unlockBadge,
+  createQuizAttempts,
+  takeQuizAttempts,
+  decrementCreateAttempts,
+  decrementTakeAttempts
+}) {
   const [view, setView] = useState('hub'); // 'hub', 'creator', 'player'
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +87,10 @@ export default function CommunityQuiz({ onClose, nickname, onActivityCreated, ad
   const [editingQuizId, setEditingQuizId] = useState(null); // null = tạo mới, string = chỉnh sửa
 
   const openCreateNew = () => {
+    if (createQuizAttempts <= 0) {
+      alert('⚠️ Bạn đã hết lượt tạo đề! Hãy hoàn thành thêm phiên học Pomodoro để nhận lượt mới.');
+      return;
+    }
     setEditingQuizId(null);
     setCreateTitle('');
     setCreateDesc('');
@@ -120,10 +134,15 @@ export default function CommunityQuiz({ onClose, nickname, onActivityCreated, ad
     if (questions.some(q => !q.questionText.trim() || q.options.some(o => !o.trim()))) {
       return alert('Vui lòng điền đầy đủ câu hỏi và 4 đáp án!');
     }
+
+    if (!editingQuizId && createQuizAttempts <= 0) {
+      return alert('⚠️ Bạn đã hết lượt tạo đề! Hãy hoàn thành thêm phiên học Pomodoro để nhận lượt mới.');
+    }
+
     setIsSaving(true);
     try {
       if (editingQuizId) {
-        // CHỈNH SẬA
+        // CHỈNH SỬA
         await updateDoc(doc(db, 'community_quizzes', editingQuizId), {
           title: createTitle,
           description: createDesc,
@@ -154,6 +173,9 @@ export default function CommunityQuiz({ onClose, nickname, onActivityCreated, ad
         if (createdCount >= 3 && unlockBadge) {
           unlockBadge('Người kiến tạo');
         }
+
+        // Trừ lượt tạo đề
+        decrementCreateAttempts();
       }
       setView('hub');
       setCreateTitle('');
@@ -483,6 +505,12 @@ ${truncatedText}`;
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
   const startQuiz = (quiz) => {
+    if (takeQuizAttempts <= 0) {
+      alert('⚠️ Bạn đã hết lượt làm đề! Hãy hoàn thành thêm phiên học Pomodoro để nhận lượt mới.');
+      return;
+    }
+    decrementTakeAttempts();
+
     // Sao chép sâu và xáo trộn ngẫu nhiên các lựa chọn đáp án (A, B, C, D) của từng câu hỏi
     const questionsCloned = quiz.questions ? quiz.questions.map(q => {
       const originalOptions = [...q.options];
@@ -695,7 +723,7 @@ Thời lượng: Khoảng 120-150 từ, dùng các ký hiệu cute và phân đo
     <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col overflow-hidden animate-in fade-in duration-300">
       {/* HEADER TỔNG */}
       {view !== 'player' && (
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 flex justify-between items-center shrink-0 shadow-lg relative z-10">
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4 flex flex-col md:flex-row justify-between md:items-center gap-4 shrink-0 shadow-lg relative z-10">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-xl">
               <BrainCircuit className="w-6 h-6" />
@@ -705,7 +733,31 @@ Thời lượng: Khoảng 120-150 từ, dùng các ký hiệu cute và phân đo
               <p className="text-emerald-100 text-xs">Cùng làm bài và chia sẻ kiến thức</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition">
+          
+          {/* Lượt tạo và làm đề */}
+          <div className="flex items-center gap-3 bg-black/15 px-4 py-2 rounded-2xl border border-white/10 text-sm self-start md:self-auto shadow-inner">
+            <div className="flex items-center gap-1.5" title="Số lượt soạn bộ câu hỏi mới còn lại">
+              <span className="font-semibold text-emerald-100">📝 Tạo đề:</span>
+              <span className={`font-black px-2 py-0.5 rounded-lg text-xs ${createQuizAttempts > 0 ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white animate-pulse'}`}>
+                {createQuizAttempts}
+              </span>
+            </div>
+            <div className="h-4 w-px bg-white/20"></div>
+            <div className="flex items-center gap-1.5" title="Số lượt làm bài trắc nghiệm còn lại">
+              <span className="font-semibold text-teal-100">✏️ Làm đề:</span>
+              <span className={`font-black px-2 py-0.5 rounded-lg text-xs ${takeQuizAttempts > 0 ? 'bg-teal-500 text-white' : 'bg-red-500 text-white animate-pulse'}`}>
+                {takeQuizAttempts}
+              </span>
+            </div>
+            {/* Gợi ý học Pomodoro */}
+            {(createQuizAttempts === 0 || takeQuizAttempts === 0) && (
+              <span className="text-[10px] text-amber-300 font-bold animate-bounce ml-1 hidden lg:inline">
+                ⏱️ Học Pomodoro để thêm lượt!
+              </span>
+            )}
+          </div>
+
+          <button onClick={onClose} className="absolute right-4 top-4 md:static p-2 hover:bg-white/20 rounded-xl transition">
             <X className="w-6 h-6" />
           </button>
         </div>
