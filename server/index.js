@@ -251,9 +251,8 @@ io.on('connection', (socket) => {
 
   // 5. NEW ACTIVITY BROADCAST
   socket.on('new-activity', (payload) => {
-    const roomId = socketRoomMap[socket.id];
-    if (!roomId) return;
-    socket.to(roomId).emit('receive-activity', payload);
+    // Phát thông báo (activity) tới TẤT CẢ mọi người trên server, không phân biệt phòng
+    io.emit('receive-activity', payload);
   });
 
   // 5. DISCONNECT

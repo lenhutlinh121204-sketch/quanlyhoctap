@@ -233,6 +233,13 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [toastNotification, setToastNotification] = useState(null);
   const showChatRef = useRef(showChat);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    if (showChat) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, showChat]);
 
   // --- STATE GAMIFICATION (CAP BAC, XP, HUY HIEU, PET) ---
   const [userXP, setUserXP] = useState(() => {
@@ -2550,6 +2557,7 @@ export default function App() {
                   );
                 })
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Input */}
