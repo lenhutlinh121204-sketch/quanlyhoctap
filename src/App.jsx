@@ -1280,33 +1280,7 @@ export default function App() {
     return <div className="w-2 h-2 rounded-full bg-slate-300"></div>;
   };
 
-  if (showTimetable) {
-    return <Timetable onClose={() => setShowTimetable(false)} />;
-  }
-
-  if (showCommunityQuiz) {
-    return (
-      <CommunityQuiz 
-        onClose={() => setShowCommunityQuiz(false)} 
-        nickname={userNickname} 
-        onActivityCreated={addActivityToFeed} 
-        addXP={addXP} 
-        unlockBadge={unlockBadge} 
-        createQuizAttempts={createQuizAttempts}
-        takeQuizAttempts={takeQuizAttempts}
-        decrementCreateAttempts={decrementCreateAttempts}
-        decrementTakeAttempts={decrementTakeAttempts}
-      />
-    );
-  }
-
-  if (showBioChem) {
-    return <BioChemQuiz onClose={() => setShowBioChem(false)} addXP={addXP} unlockBadge={unlockBadge} />;
-  }
-
-  if (showFlashcards) {
-    return <FlashcardsHub onClose={() => setShowFlashcards(false)} nickname={userNickname} onActivityCreated={addActivityToFeed} />;
-  }
+  // Quản lý các view qua conditional rendering trong khối return chính để giữ Chat widget luôn hoạt động
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50 font-sans text-slate-800 p-4 md:p-6 lg:p-8">
@@ -1446,8 +1420,29 @@ export default function App() {
       
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* HEADER */}
-        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/90 backdrop-blur-sm p-5 rounded-3xl shadow-sm border border-slate-200">
+        {/* CONDITIONAL SUB-PAGES */}
+        {showTimetable ? (
+          <Timetable onClose={() => setShowTimetable(false)} />
+        ) : showCommunityQuiz ? (
+          <CommunityQuiz 
+            onClose={() => setShowCommunityQuiz(false)} 
+            nickname={userNickname} 
+            onActivityCreated={addActivityToFeed} 
+            addXP={addXP} 
+            unlockBadge={unlockBadge} 
+            createQuizAttempts={createQuizAttempts}
+            takeQuizAttempts={takeQuizAttempts}
+            decrementCreateAttempts={decrementCreateAttempts}
+            decrementTakeAttempts={decrementTakeAttempts}
+          />
+        ) : showBioChem ? (
+          <BioChemQuiz onClose={() => setShowBioChem(false)} addXP={addXP} unlockBadge={unlockBadge} />
+        ) : showFlashcards ? (
+          <FlashcardsHub onClose={() => setShowFlashcards(false)} nickname={userNickname} onActivityCreated={addActivityToFeed} />
+        ) : (
+          <>
+            {/* HEADER */}
+            <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/90 backdrop-blur-sm p-5 rounded-3xl shadow-sm border border-slate-200">
           <div>
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 shadow-sm overflow-hidden shrink-0">
@@ -2515,6 +2510,8 @@ export default function App() {
             
           </div>
         </div>
+          </>
+        )}
 
         {/* MODAL NHẬP NICKNAME & PHÒNG */}
         {!isNicknameSet && (
@@ -2841,6 +2838,34 @@ export default function App() {
               </div>
             )}
           </div>
+        )}
+
+        {/* FLOATING CHAT BUTTON (Modern Circle Widget) */}
+        {isNicknameSet && (
+          <button
+            onClick={() => {
+              setShowChat(!showChat);
+              if (!showChat) setUnreadCount(0);
+            }}
+            className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 z-50 group animate-bounce"
+            title="Trò chuyện nhóm"
+          >
+            {showChat ? (
+              <X className="w-6 h-6 transition-transform group-hover:rotate-90 duration-200" />
+            ) : (
+              <MessageCircle className="w-6 h-6" />
+            )}
+            
+            {unreadCount > 0 ? (
+              <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-black text-white shadow-md border-2 border-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            ) : usersOnline.length > 0 ? (
+              <span className="absolute -top-1 -right-1 bg-emerald-500 text-[10px] font-black text-white px-1.5 py-0.5 rounded-full shadow-md border border-white">
+                {usersOnline.length}
+              </span>
+            ) : null}
+          </button>
         )}
 
         {/* MODAL ĐỔI PHÒNG */}
